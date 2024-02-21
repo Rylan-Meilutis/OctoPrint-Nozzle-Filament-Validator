@@ -111,19 +111,21 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self._logger.info("Print passed nozzle and filament check...")
 
     def fetch_nozzles_from_database(self):
-        cursor = self._conn.cursor()
+        con = self.get_db()
+        cursor = con.cursor()
         cursor.execute("SELECT id, size FROM nozzles")
-        self._conn.commit()
+        con.commit()
         return [{"id": row[0], "size": row[1]} for row in cursor.fetchall()]
 
     def add_nozzle_to_database(self, nozzle_size):
         try:
-            cursor = self._conn.cursor()
+            con = self.get_db()
+            cursor = con.cursor()
 
             # Check if the nozzle size already exists in the database
             cursor.execute("SELECT size FROM nozzles WHERE size = ?", (float(nozzle_size),))
             existing_size = cursor.fetchone()
-            self._conn.commit()
+            con.commit()
 
             # If the size already exists, log an error
             if existing_size:
@@ -131,25 +133,30 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             else:
                 # Otherwise, insert the nozzle size into the database
                 cursor.execute("INSERT INTO nozzles (size) VALUES (?)", (float(nozzle_size),))
-                self._conn.commit()
+                con.commit()
         except Exception as e:
             self._logger.error(f"Error adding nozzle to the database: {e}")
 
     def select_current_nozzle(self, selected_nozzle_id):
-        cursor = self._conn.cursor()
+        con = self.get_db()
+        cursor = con.cursor()
         cursor.execute("UPDATE current_nozzle SET nozzle_id = ? WHERE id = 1",
                        (int(selected_nozzle_id),))  # Assuming there's only one current nozzle
-        self._conn.commit()
+        con.commit()
 
-    def initialize(self):
-        # Connect to the SQLite database
+    def get_db(self):
         data_folder = self.get_plugin_data_folder()
         if not os.path.exists(data_folder):
             os.makedirs(data_folder)
 
         # Construct the path to the SQLite database file
         db_path = os.path.join(data_folder, "nozzle_filament_database.db")
-        self._conn = sqlite3.connect(db_path)
+        return sqlite3.connect(db_path)
+
+    def initialize(self):
+        # Connect to the SQLite database
+        self._conn = self.get_db()
+
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS nozzles (id INTEGER PRIMARY KEY, size REAL)")
         self._conn.execute("CREATE TABLE IF NOT EXISTS current_nozzle (id INTEGER PRIMARY KEY, nozzle_id INTEGER)")
@@ -181,12 +188,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         nozzle_id = self.get_current_nozzle_id()
 
         if nozzle_id is not None:
-            cursor = self._conn.cursor()
+            con = self.get_db()
+            cursor = con.cursor()
             # Extract the ID from the fetched row
 
             # Execute a SELECT query to retrieve the size based on the current nozzle ID
             cursor.execute("SELECT size FROM nozzles WHERE id = ?", (nozzle_id,))
-            self._conn.commit()
+            con.commit()
             # Fetch the size corresponding to the current nozzle ID
             result = cursor.fetchone()
 
@@ -199,27 +207,30 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     def get_current_nozzle_id(self):
         # Create a cursor to execute SQL queries
-        cursor = self._conn.cursor()
+        con = self.get_db()
+        cursor = con.cursor()
 
         # Execute a SELECT query to retrieve the current nozzle ID
         cursor.execute("SELECT nozzle_id FROM current_nozzle WHERE id = 1")
 
         # Fetch the current nozzle ID
         data_id = cursor.fetchone()
+        con.commit()
 
         return data_id[0] if data_id else None
 
     def remove_nozzle_from_database(self, nozzle_id):
-        cursor = self._conn.cursor()
+        con = self.get_db()
+        cursor = con.cursor()
         cursor.execute("DELETE FROM nozzles WHERE id = ?", (nozzle_id,))
-        self._conn.commit()
+        con.commit()
 
         # Check if the removed nozzle was the current nozzle
         current_nozzle_id = self.get_current_nozzle_id()
         if current_nozzle_id == nozzle_id:
             cursor.execute("UPDATE current_nozzle SET nozzle_id = ? WHERE id = ?",
                            (1, 1))  # Assuming there's only one current nozzle
-            self._conn.commit()
+            con.commit()
 
     def on_event(self, event, payload):
         if event == Events.PRINT_STARTED:
