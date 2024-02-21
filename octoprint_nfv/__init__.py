@@ -44,7 +44,10 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         if command == "addNozzle":
             nozzle_size = data["size"]
             if nozzle_size is not None:
-                self.add_nozzle_to_database(nozzle_size)
+                try:
+                    self.add_nozzle_to_database(nozzle_size)
+                except Exception as e:
+                    self.send_alert(f"Error adding nozzle to the database: {e}", "error")
                 return flask.jsonify(success=True)
             else:
                 return flask.abort(400)
@@ -52,22 +55,29 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         elif command == "selectNozzle":
             selected_nozzle_id = data.get("nozzleId")
             if selected_nozzle_id is not None:
-                self.select_current_nozzle(selected_nozzle_id)
+                try:
+                    self.select_current_nozzle(selected_nozzle_id)
+                except Exception as e:
+                    self.send_alert(f"Error selecting nozzle: {e}", "error")
                 return flask.jsonify(success=True)
             else:
                 return flask.abort(400)
+
         elif command == "removeNozzle":
             nozzle_id = data.get("nozzleId")
             if nozzle_id is not None:
-                self.remove_nozzle_from_database(nozzle_id)
+                try:
+                    self.remove_nozzle_from_database(nozzle_id)
+                except Exception as e:
+                    self.send_alert(f"Error removing nozzle from the database: {e}", "error")
                 return flask.jsonify(success=True)
             else:
                 return flask.abort(400)
 
         return flask.jsonify(error="'{}' is an invalid command".format(command)), 400
 
-    def send_alert(self, message):
-        self._plugin_manager.send_plugin_message(self._identifier, dict(type="popup", msg=message))
+    def send_alert(self, message, type="popup"):
+        self._plugin_manager.send_plugin_message(self._identifier, dict(type=type, msg=message))
 
     def on_settings_save(self, data):
         octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
@@ -82,12 +92,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self._logger.setLevel(logging.INFO)
         # Retrieve the loaded filament type from spool manager
         self._logger.info("Checking print for nozzle and filament settings...")
-        loaded_filament = self.get_loaded_filament()
-
+        try:
+            loaded_filament = self.get_loaded_filament()
+        except Exception as e:
+            self.send_alert(f"Error retrieving loaded filament: {e}", "error")
+            return
         # Parse the GCODE file to extract the nozzle size and filament type
-        self._logger.info("file_path: " + file_path)
         gcode_info = self.parse_gcode(file_path)
-        self._logger.info("gcode_info: " + str(gcode_info))
 
         # Check if the loaded filament matches the filament type in the GCODE
         if gcode_info["filament_type"] is None:
@@ -177,23 +188,53 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self._spool_manager = SpoolManagerIntegration(smplugin, self._logger)
 
         # Retry inserting a row into current_nozzle with a maximum of 3 attempts
-        retries = 0
-        while retries < 3:
-            try:
-                cursor = self._conn.cursor()
-                cursor.execute("INSERT INTO current_nozzle (nozzle_id) VALUES (?)", (1,))
-                self._conn.commit()
-                break
-            except sqlite3.OperationalError as e:
-                self._logger.warning(f"Database operation failed: {e}")
-                self._logger.warning("Retrying...")
-                retries += 1
-                time.sleep(1)  # Wait for 1 second before retrying
+        try:
+            retries = 0
+            cursor = self._conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM current_nozzle")
+            count = cursor.fetchone()[0]
+            if count == 0:
+                while retries < 3:
+                    try:
+                        cursor = self._conn.cursor()
+                        cursor.execute("INSERT INTO current_nozzle (nozzle_id) VALUES (?)", (1,))
+                        self._conn.commit()
+                        break
+                    except sqlite3.OperationalError as e:
+                        self._logger.warning(f"Database operation failed: {e}")
+                        self._logger.warning("Retrying...")
+                        retries += 1
+                        time.sleep(1)  # Wait for 1 second before retrying
 
-        if retries == 3:
-            self._logger.error(
-                "Failed to insert row into current_nozzle after multiple attempts. Plugin initialization may be "
-                "incomplete.")
+                if retries == 3:
+                    self._logger.error(
+                        "Failed to insert row into current_nozzle after multiple attempts. Plugin initialization may be"
+                        "incomplete.")
+        except Exception as e:
+            self._logger.error(f"Error adding nozzle to the database: {e}")
+
+        try:
+            retries = 0
+            cursor = self._conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM nozzles")
+            count = cursor.fetchone()[0]
+            if count == 0:
+                while retries < 3:
+                    try:
+                        self.add_nozzle_to_database(0.4)
+                        break
+                    except sqlite3.OperationalError as e:
+                        self._logger.warning(f"Database operation failed: {e}")
+                        self._logger.warning("Retrying...")
+                        retries += 1
+                        time.sleep(1)  # Wait for 1 second before retrying
+
+                if retries == 3:
+                    self._logger.error(
+                        "Failed to insert row into current_nozzle after multiple attempts. Plugin initialization may "
+                        "be incomplete.")
+        except Exception as e:
+            self._logger.error(f"Error adding nozzle to the database: {e}")
 
     def get_current_nozzle_size(self):
         nozzle_id = self.get_current_nozzle_id()
@@ -326,10 +367,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             filament_type = None
             if nozzle_match:
                 nozzle_size = float(nozzle_match.group(1))
-                print("Nozzle Diameter:", nozzle_size)
             if filament_match:
                 filament_type = filament_match.group(1).strip()
-                print("Filament Type:", filament_type)
 
         return {"nozzle_size": nozzle_size, "filament_type": filament_type}
 
