@@ -336,7 +336,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
             # Assuming the first loaded filament is the currently used one
             loaded_filament = materials[0]
-            return loaded_filament.split("_")[0]
+            return loaded_filament.split("_")[0] if loaded_filament else None
         except Exception as e:
             self._logger.error(f"Error retrieving loaded filament: {e}")
             return -2
