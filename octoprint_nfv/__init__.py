@@ -109,7 +109,16 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             self.send_alert("No filament loaded, error checking won't be performed")
             return
 
-        if gcode_info["filament_type"].lower() != loaded_filament.lower() and gcode_info["filament_type"] is not None:
+        if loaded_filament == -1:
+            self.send_alert("Spool Manager plugin is not installed. Filament type will not be checked.")
+            return
+
+        if loaded_filament == -2:
+            self.send_alert("Error retrieving loaded filament, filament error checking won't be performed")
+            return
+
+        if (gcode_info["filament_type"].lower() != str(loaded_filament).lower() and gcode_info["filament_type"] is not
+                None):
             self._logger.error("Print aborted: Incorrect filament type")
             self.send_alert("Print aborted: Incorrect filament type")
             self._printer.cancel_print()
@@ -124,8 +133,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             self.send_alert("No nozzle selected, error checking won't be performed")
             return
 
-        if (gcode_info["nozzle_size"] != float(self.get_current_nozzle_size()) and gcode_info["nozzle_size"] is not
-                None):
+        if (float(gcode_info["nozzle_size"]) != float(self.get_current_nozzle_size()) and gcode_info["nozzle_size"] is
+                not None):
             self._logger.error("Print aborted: Incorrect nozzle size")
             self.send_alert("Print aborted: Incorrect nozzle size")
             self._printer.cancel_print()
@@ -317,7 +326,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         try:
             if self._spool_manager is None:
                 self._logger.warning("Spool Manager plugin is not installed. Filament type will not be checked.")
-                return None
+                return -1
 
             materials = self._spool_manager.get_materials()
 
@@ -330,7 +339,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             return loaded_filament.split("_")[0]
         except Exception as e:
             self._logger.error(f"Error retrieving loaded filament: {e}")
-            return None
+            return -2
 
     def parse_gcode(self, file_path):
         # Regular expression patterns to extract nozzle diameter and filament type

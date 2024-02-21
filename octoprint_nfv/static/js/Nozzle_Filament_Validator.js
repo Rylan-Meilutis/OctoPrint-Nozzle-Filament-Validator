@@ -13,12 +13,31 @@ $(function () {
                 $.each(response.nozzles, function (index, nozzle) {
                     $("#nozzles-list").append($("<option>", {value: nozzle.id, text: nozzle.size}));
                 });
-
+                let filament = response.filament_type;
+                if (filament === "") {
+                    filament = "No filament selected";
+                }
+                else if (filament === "None") {
+                    filament = "No filament selected";
+                }
+                else if (filament === -1) {
+                    filament = "Spool manager is not installed, please install it to to enable filament error checking";
+                }
+                else if (filament === -2) {
+                    filament = "An error occurred while fetching the filament type, please try again";
+                }
                 // Update current filament type
-                $("#current-filament").text(response.filament_type);
+                $("#current-filament").text(filament);
 
+                let currentNozzle = response.currentNozzle
+                if (currentNozzle === "") {
+                    currentNozzle = "No nozzle selected";
+                }
+                else if (currentNozzle === "None") {
+                    currentNozzle = "No nozzle selected";
+                }
                 // Update current nozzle size
-                $("#current-nozzle").text(response.currentNozzle);
+                $("#current-nozzle").text(currentNozzle);
             },
             error: function (xhr, status, error) {
                 console.error("Error fetching data:", error);
@@ -138,7 +157,7 @@ $(function () {
                     title: 'Continuous Print',
                     text: data.msg,
                     type: theme,
-                    hide: (theme !== 'danger'),
+                    hide: false,
                     buttons: {closer: true, sticker: false}
                 });
             }
