@@ -336,7 +336,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
             # Assuming the first loaded filament is the currently used one
             loaded_filament = materials[0]
-            return loaded_filament.split("_")[0] if loaded_filament else None
+            return loaded_filament.split("_")[0] if loaded_filament is not None else None
         except Exception as e:
             self._logger.error(f"Error retrieving loaded filament: {e}")
             return -2
@@ -418,7 +418,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 # If you want your plugin to be registered within OctoPrint under a different name than what you defined in setup.py
 # ("OctoPrint-PluginSkeleton"), you may define that here. Same goes for the other metadata derived from setup.py that
 # can be overwritten via __plugin_xyz__ control properties. See the documentation for that.
-__plugin_name__ = "Nozzle_filament_validator Plugin"
+__plugin_name__ = "Nozzle Filament Validator"
 
 # Set the Python version your plugin is compatible with below. Recommended is Python 3 only for all new plugins.
 # OctoPrint 1.4.0 - 1.7.x run under both Python 3 and the end-of-life Python 2.
