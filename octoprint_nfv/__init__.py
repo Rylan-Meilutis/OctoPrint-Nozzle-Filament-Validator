@@ -92,6 +92,11 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         # Check if the loaded filament matches the filament type in the GCODE
         if gcode_info["filament_type"] is None:
             self.send_alert("No filament type found in GCODE, error checking won't be performed")
+            return
+
+        if loaded_filament is None:
+            self.send_alert("No filament loaded, error checking won't be performed")
+            return
 
         if gcode_info["filament_type"].lower() != loaded_filament.lower() and gcode_info["filament_type"] is not None:
             self._logger.error("Print aborted: Incorrect filament type")
@@ -102,6 +107,12 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         # Check if the loaded nozzle size matches the nozzle size in the GCODE
         if gcode_info["nozzle_size"] is None:
             self.send_alert("No nozzle size found in GCODE, error checking won't be performed")
+            return
+
+        if self.get_current_nozzle_size() is None:
+            self.send_alert("No nozzle selected, error checking won't be performed")
+            return
+
         if (gcode_info["nozzle_size"] != float(self.get_current_nozzle_size()) and gcode_info["nozzle_size"] is not
                 None):
             self._logger.error("Print aborted: Incorrect nozzle size")
