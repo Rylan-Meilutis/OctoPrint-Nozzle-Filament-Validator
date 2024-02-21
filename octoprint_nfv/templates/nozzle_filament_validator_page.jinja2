@@ -1,0 +1,33 @@
+<div class="container">
+    <h1>Nozzle Filament Validator</h1>
+
+    <div>
+        <strong>Current Filament Type:</strong>&nbsp;<span id="current-filament"></span>&nbsp;&nbsp;
+        <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
+    </div>
+
+    <!-- Display the current nozzle size -->
+    <div>
+        <strong>Current Nozzle Size:</strong> <span id="current-nozzle"></span>
+        <br><br>
+    </div>
+
+    <!-- Input for adding a new nozzle -->
+    <div class="form-group">
+        <label for="nozzle-size-input">Add New Nozzle Size:</label>
+        <input type="number" class="form-control" id="nozzle-size-input" placeholder="Enter nozzle size">
+        <button id="add-nozzle-button" class="btn btn-primary">Add Nozzle</button>
+    </div>
+
+    <!-- Select dropdown for choosing current nozzle -->
+    <div class="form-group">
+        <label for="nozzles-list">Select Current Nozzle:</label>
+        <select id="nozzles-list" class="form-control"></select>
+        <button id="select-nozzle-button" class="btn btn-success">Select Nozzle</button>
+    </div>
+
+    <!-- Button to remove selected nozzle -->
+    <div class="form-group">
+        <button id="remove-nozzle-button" class="btn btn-danger">Remove Nozzle</button>
+    </div>
+</div>

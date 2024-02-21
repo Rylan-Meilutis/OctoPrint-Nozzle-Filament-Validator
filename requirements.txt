@@ -1,1 +1,14 @@
-OctoPrint>=1.3.10
+###
+# This file is only here to make sure that something like
+#
+#    pip install -e .
+#
+# works as expected. Requirements can be found in setup.py.
+###
+
+.
+
+setuptools>=68.2.0
+OctoPrint>=1.9.3
+
+Flask>=2.2.5
