@@ -117,7 +117,6 @@ $(function () {
 
         this.onDataUpdaterPluginMessage = function (plugin, data) {
             if (plugin !== "Nozzle_Filament_Validator") {
-                console.log("Received message from unknown plugin:", plugin, data);
                 return;
             }
 
