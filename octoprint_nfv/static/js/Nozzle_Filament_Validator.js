@@ -16,14 +16,11 @@ $(function () {
                 let filament = response.filament_type;
                 if (filament === "" || filament === null || filament === undefined || filament === " ") {
                     filament = "No filament selected";
-                }
-                else if (filament === "None") {
+                } else if (filament === "None") {
                     filament = "No filament selected";
-                }
-                else if (filament === -1) {
+                } else if (filament === -1) {
                     filament = "Spool manager is not installed, please install it to to enable filament error checking";
-                }
-                else if (filament === -2) {
+                } else if (filament === -2) {
                     filament = "An error occurred while fetching the filament type, please try again";
                 }
                 // Update current filament type
@@ -32,8 +29,7 @@ $(function () {
                 let currentNozzle = response.currentNozzle
                 if (currentNozzle === "") {
                     currentNozzle = "No nozzle selected";
-                }
-                else if (currentNozzle === "None") {
+                } else if (currentNozzle === "None") {
                     currentNozzle = "No nozzle selected";
                 }
                 // Update current nozzle size
@@ -147,6 +143,9 @@ $(function () {
                 case "error":
                     theme = 'danger';
                     break;
+                case "info":
+                    theme = "info";
+                    break;
                 default:
                     theme = "info";
                     break;
@@ -154,10 +153,10 @@ $(function () {
 
             if (data.msg !== "") {
                 new PNotify({
-                    title: 'Continuous Print',
+                    title: 'Nozzle Filament Validator',
                     text: data.msg,
                     type: theme,
-                    hide: false,
+                    hide: data.type === 'info',
                     buttons: {closer: true, sticker: false}
                 });
             }
