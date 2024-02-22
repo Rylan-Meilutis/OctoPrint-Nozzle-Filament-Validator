@@ -14,7 +14,7 @@ $(function () {
                     $("#nozzles-list").append($("<option>", {value: nozzle.id, text: nozzle.size}));
                 });
                 let filament = response.filament_type;
-                if (filament === "") {
+                if (filament === "" || filament === null || filament === undefined || filament === " ") {
                     filament = "No filament selected";
                 }
                 else if (filament === "None") {
