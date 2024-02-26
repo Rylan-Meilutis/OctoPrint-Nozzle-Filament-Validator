@@ -1,1 +1,9 @@
-/* TODO: Have your plugin's CSS files generated to here. */
+.checkbox-container {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 100%; /* Adjust the maximum width as needed */
+}
+
+.checkbox-container > div {
+    margin-right: 15px; /* Adjust spacing between checkboxes as needed */
+}

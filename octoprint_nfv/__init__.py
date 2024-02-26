@@ -13,6 +13,9 @@ from flask_login import current_user
 from octoprint.events import Events
 from octoprint.filemanager import FileDestinations
 
+import octoprint_nfv.build_plate as build_plate
+import octoprint_nfv.nozzle as nozzle
+from octoprint_nfv.db import get_db, init_db
 from octoprint_nfv.spoolManager import SpoolManagerIntegration
 
 
@@ -25,15 +28,32 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     def __init__(self):
         super().__init__()
-        self._conn = None
         self._spool_manager = None
+        self.nozzle = None
+        self.build_plate = None
 
     def get_api_commands(self):
         return dict(
             addNozzle=["size"],
             selectNozzle=["nozzleId"],
-            removeNozzle=["nozzleId"]
+            removeNozzle=["nozzleId"],
+            add_build_plate=["name", "compatibleFilaments", "id"],
+            select_build_plate=["buildPlateId"],
+            remove_build_plate=["buildPlateId"],
+            get_build_plate=["buildPlateId"]
         )
+
+    def on_api_get(self, request):
+        nozzles = self.nozzle.fetch_nozzles_from_database()
+        filament_type = self.get_loaded_filament()
+        current_nozzle = self.nozzle.get_current_nozzle_size()
+        build_plates = self.build_plate.fetch_build_plates_from_database()
+        current_build_plate = self.build_plate.get_current_build_plate_name()
+        current_build_plate_filaments = self.build_plate.get_current_build_plate_filaments()
+        filaments = build_plate.get_filament_types()
+        return flask.jsonify(nozzles=nozzles, filament_type=filament_type, currentNozzle=current_nozzle,
+                             build_plates=build_plates, currentBuildPlate=current_build_plate,
+                             currentBuildPlateFilaments=current_build_plate_filaments, filaments=filaments)
 
     def on_api_command(self, command, data):
         import flask
@@ -41,200 +61,218 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         if current_user.is_anonymous():
             return "Insufficient rights", 403
 
-        if command == "addNozzle":
-            nozzle_size = data["size"]
-            if nozzle_size is not None:
-                try:
-                    self.add_nozzle_to_database(nozzle_size)
-                except Exception as e:
-                    self.send_alert(f"Error adding nozzle to the database: {e}", "error")
-                return flask.jsonify(success=True)
-            else:
-                return flask.abort(400)
+        match command:
+            case "addNozzle":
+                nozzle_size = data["size"]
+                if nozzle_size is not None:
+                    try:
+                        self.nozzle.add_nozzle_to_database(nozzle_size)
+                    except Exception as e:
+                        self.send_alert(f"Error adding nozzle to the database: {e}", "error")
+                    return flask.jsonify(success=True)
+                else:
+                    return flask.abort(400)
 
-        elif command == "selectNozzle":
-            selected_nozzle_id = data.get("nozzleId")
-            if selected_nozzle_id is not None:
-                try:
-                    self.select_current_nozzle(selected_nozzle_id)
-                except Exception as e:
-                    self.send_alert(f"Error selecting nozzle: {e}", "error")
-                return flask.jsonify(success=True)
-            else:
-                return flask.abort(400)
+            case "selectNozzle":
+                selected_nozzle_id = data.get("nozzleId")
+                if selected_nozzle_id is not None:
+                    try:
+                        self.nozzle.select_current_nozzle(selected_nozzle_id)
+                    except Exception as e:
+                        self.send_alert(f"Error selecting nozzle: {e}", "error")
+                    return flask.jsonify(success=True)
+                else:
+                    return flask.abort(400)
 
-        elif command == "removeNozzle":
-            nozzle_id = data.get("nozzleId")
-            if nozzle_id is not None:
-                try:
-                    self.remove_nozzle_from_database(nozzle_id)
-                except Exception as e:
-                    self.send_alert(f"Error removing nozzle from the database: {e}", "error")
-                return flask.jsonify(success=True)
-            else:
-                return flask.abort(400)
+            case "removeNozzle":
+                nozzle_id = data.get("nozzleId")
+                if nozzle_id is not None:
+                    try:
+                        self.nozzle.remove_nozzle_from_database(nozzle_id)
+                    except Exception as e:
+                        self.send_alert(f"Error removing nozzle from the database: {e}", "error")
+                    return flask.jsonify(success=True)
+                else:
+                    return flask.abort(400)
 
-        return flask.jsonify(error="'{}' is an invalid command".format(command)), 400
+            case "add_build_plate":
+                name = data["name"]
+                compatible_filaments = data["compatibleFilaments"]
+                db_position = data.get("id") if data.get("id") is not None or data.get("id") != "" else None
+                if name is not None and compatible_filaments is not None:
+                    try:
+                        self.build_plate.insert_build_plate_to_database(name, compatible_filaments, db_position)
+                    except Exception as e:
+                        self.send_alert(e, "tmp_error")
+                    return flask.jsonify(success=True)
+                else:
+                    return flask.abort(400)
 
-    def send_alert(self, message, type="popup"):
-        self._plugin_manager.send_plugin_message(self._identifier, dict(type=type, msg=message))
+            case "select_build_plate":
+                selected_build_plate_id = data.get("buildPlateId")
+                if selected_build_plate_id is not None:
+                    try:
+                        self.build_plate.select_current_build_plate(selected_build_plate_id)
+                    except Exception as e:
+                        self.send_alert(f"Error selecting build_plate: {e}", "error")
+                    return flask.jsonify(success=True)
+                else:
+                    return flask.abort(400)
+
+            case "remove_build_plate":
+                selected_build_plate_id = data.get("buildPlateId")
+                if selected_build_plate_id is not None:
+                    try:
+                        self.build_plate.remove_build_plate_from_database(selected_build_plate_id)
+                    except Exception as e:
+                        self.send_alert(f"Error removing build_plate from the database: {e}", "error")
+                    return flask.jsonify(success=True)
+                else:
+                    return flask.abort(400)
+
+            case "get_build_plate":
+                selected_build_plate_id = data.get("buildPlateId")
+                if selected_build_plate_id is not None:
+                    try:
+                        current_build_plate = self.build_plate.get_build_plate_name_by_id(selected_build_plate_id)
+                        current_build_plate_filaments = str(self.build_plate.get_build_plate_filaments_by_id(
+                            selected_build_plate_id))
+                        return flask.jsonify(name=current_build_plate, filaments=current_build_plate_filaments)
+                    except Exception as e:
+                        self.send_alert(f"Error retrieving build_plate from the database: {e}", "tmp_error")
+                        return flask.abort(502)
+                else:
+                    return flask.abort(400)
+
+        return flask.abort(400)
+
+    def send_alert(self, message, alert_type="popup"):
+        self._plugin_manager.send_plugin_message(self._identifier, dict(type=alert_type, msg=message))
 
     def on_settings_save(self, data):
         octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
 
-    def on_api_get(self, request):
-        nozzles = self.fetch_nozzles_from_database()
-        filament_type = self.get_loaded_filament()
-        current_nozzle = self.get_current_nozzle_size()
-        return flask.jsonify(nozzles=nozzles, filament_type=filament_type, currentNozzle=current_nozzle)
-
     def check_print(self, file_path):
         self._logger.setLevel(logging.INFO)
-        passed = True
-        # Retrieve the loaded filament type from spool manager
+        nozzle_passed = True
+        filament_passed = True
+        build_plate_passed = True
+        # Retrieve the loaded filament alert_type from spool manager
         self._logger.info("Checking print for nozzle and filament settings...")
         try:
             loaded_filament = self.get_loaded_filament()
         except Exception as e:
             self.send_alert(f"Error retrieving loaded filament: {e}", "error")
             return
-        # Parse the GCODE file to extract the nozzle size and filament type
+        # Parse the GCODE file to extract the nozzle size and filament alert_type
         gcode_info = self.parse_gcode(file_path)
 
-        # Check if the loaded filament matches the filament type in the GCODE
+        # Check if the loaded filament matches the filament alert_type in the GCODE
         if gcode_info["filament_type"] is None:
-            self.send_alert("No filament type found in GCODE, error checking won't be performed", "info")
-            passed = False
+            self.send_alert("No filament alert_type found in GCODE, error checking won't be performed", "info")
+            filament_passed = False
 
         elif loaded_filament is None:
             self.send_alert("No filament loaded, error checking won't be performed", "info")
-            passed = False
+            filament_passed = False
 
         elif loaded_filament == -1:
-            self.send_alert("Spool Manager plugin is not installed. Filament type will not be checked.", "info")
-            passed = False
+            self.send_alert("Spool Manager plugin is not installed. Filament alert_type will not be checked.", "info")
+            filament_passed = False
 
         elif loaded_filament == -2:
             self.send_alert("Error retrieving loaded filament, filament error checking won't be performed", "info")
-            passed = False
+            filament_passed = False
 
         if (gcode_info["filament_type"].lower() != str(loaded_filament).lower() and gcode_info["filament_type"] is not
-                None):
-            self._logger.error("Print aborted: Incorrect filament type")
-            self.send_alert("Print aborted: Incorrect filament type", "error")
+                None and filament_passed is not False):
+            self._logger.error("Print aborted: Incorrect filament alert_type")
+            self.send_alert("Print aborted: Incorrect filament alert_type", "error")
             self._printer.cancel_print()
             return
 
         # Check if the loaded nozzle size matches the nozzle size in the GCODE
         if gcode_info["nozzle_size"] is None:
             self.send_alert("No nozzle size found in GCODE, error checking won't be performed", "info")
-            passed = False
+            nozzle_passed = False
 
-        elif self.get_current_nozzle_size() is None:
+        elif self.nozzle.get_current_nozzle_size() is None:
             self.send_alert("No nozzle selected, error checking won't be performed", "info")
-            passed = False
+            nozzle_passed = False
 
-        if (float(gcode_info["nozzle_size"]) != float(self.get_current_nozzle_size()) and gcode_info["nozzle_size"] is
-                not None):
+        if (float(gcode_info["nozzle_size"]) != float(self.nozzle.get_current_nozzle_size()) and gcode_info[
+            "nozzle_size"] is
+                not None and nozzle_passed is not False):
             self._logger.error("Print aborted: Incorrect nozzle size")
             self.send_alert("Print aborted: Incorrect nozzle size", "error")
             self._printer.cancel_print()
             return
-        
-        if passed:
+
+        # Check if the build plate is compatible with the loaded filament
+        if gcode_info["filament_type"] is not None:
+            if not self.build_plate.is_filament_compatible_with_build_plate(gcode_info["filament_type"]):
+                self._logger.error("Print aborted: Incompatible build plate")
+                self.send_alert("Print aborted: Incompatible build plate", "error")
+                self._printer.cancel_print()
+                return
+
+        if nozzle_passed and filament_passed and build_plate_passed:
             self.send_alert("Print passed nozzle and filament check", "info")
             self._logger.info("Print passed nozzle and filament check...")
 
-    def fetch_nozzles_from_database(self):
-        con = self.get_db()
-        cursor = con.cursor()
-        cursor.execute("SELECT id, size FROM nozzles")
-        con.commit()
-        return [{"id": row[0], "size": row[1]} for row in cursor.fetchall()]
-
-    def add_nozzle_to_database(self, nozzle_size):
-        try:
-            con = self.get_db()
-            cursor = con.cursor()
-
-            # Check if the nozzle size already exists in the database
-            cursor.execute("SELECT size FROM nozzles WHERE size = ?", (float(nozzle_size),))
-            existing_size = cursor.fetchone()
-            con.commit()
-
-            # If the size already exists, log an error
-            if existing_size:
-                self._logger.error("Nozzle size already exists in the database")
-            else:
-                # Otherwise, insert the nozzle size into the database
-                cursor.execute("INSERT INTO nozzles (size) VALUES (?)", (float(nozzle_size),))
-                con.commit()
-        except Exception as e:
-            self._logger.error(f"Error adding nozzle to the database: {e}")
-
-    def select_current_nozzle(self, selected_nozzle_id):
-        con = self.get_db()
-        cursor = con.cursor()
-        cursor.execute("UPDATE current_nozzle SET nozzle_id = ? WHERE id = 1",
-                       (int(selected_nozzle_id),))  # Assuming there's only one current nozzle
-        con.commit()
-
-    def get_db(self):
-        data_folder = self.get_plugin_data_folder()
-        if not os.path.exists(data_folder):
-            os.makedirs(data_folder)
-
-        # Construct the path to the SQLite database file
-        db_path = os.path.join(data_folder, "nozzle_filament_database.db")
-        return sqlite3.connect(db_path)
-
     def initialize(self):
-        # Connect to the SQLite database
-        self._conn = self.get_db()
-
-        self._conn.execute(
-            "CREATE TABLE IF NOT EXISTS nozzles (id INTEGER PRIMARY KEY, size REAL)")
-        self._conn.execute("CREATE TABLE IF NOT EXISTS current_nozzle (id INTEGER PRIMARY KEY, nozzle_id INTEGER)")
-        self._conn.commit()
+        conn = get_db(self.get_plugin_data_folder())
 
         smplugin = self._plugin_manager.plugins.get("SpoolManager").implementation
         self._spool_manager = SpoolManagerIntegration(smplugin, self._logger)
+        init_db(self.get_plugin_data_folder())
 
-        # Retry inserting a row into current_nozzle with a maximum of 3 attempts
+        self.nozzle = nozzle.nozzle(self.get_plugin_data_folder(), self._logger)
+        self.build_plate = build_plate.build_plate(self.get_plugin_data_folder(), self._logger)
+
+        # Retry inserting a row into current_selections with a maximum of 3 attempts
+        def check_and_insert_to_db(column: str):
+            try:
+                retry = 0
+                index = conn.cursor()
+
+                # Check if the column already exists in the table schema
+                index.execute("SELECT COUNT(*) FROM pragma_table_info('current_selections') WHERE name = ?",
+                              (column,))
+                exists = index.fetchone()[0]
+
+                if not exists:
+                    while retry < 3:
+                        try:
+                            index.execute("INSERT INTO current_selections (id, selection) VALUES (?, ?)",
+                                          (column, 1))
+                            conn.commit()
+                            break
+                        except sqlite3.OperationalError as error:
+                            self._logger.warning(f"Database operation failed: {error}")
+                            self._logger.warning("Retrying...")
+                            retry += 1
+                            time.sleep(1)  # Wait for 1 second before retrying
+
+                    if retry == 3:
+                        self._logger.error(
+                            "Failed to insert row into current_selections after multiple attempts. Plugin "
+                            "initialization may be incomplete.")
+            except Exception as error:
+                self._logger.error(f"Error adding nozzle to the database: {error}")
+
+        check_and_insert_to_db("nozzle")
+        check_and_insert_to_db("build_plate")
+
         try:
             retries = 0
-            cursor = self._conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM current_nozzle")
-            count = cursor.fetchone()[0]
-            if count == 0:
-                while retries < 3:
-                    try:
-                        cursor = self._conn.cursor()
-                        cursor.execute("INSERT INTO current_nozzle (nozzle_id) VALUES (?)", (1,))
-                        self._conn.commit()
-                        break
-                    except sqlite3.OperationalError as e:
-                        self._logger.warning(f"Database operation failed: {e}")
-                        self._logger.warning("Retrying...")
-                        retries += 1
-                        time.sleep(1)  # Wait for 1 second before retrying
-
-                if retries == 3:
-                    self._logger.error(
-                        "Failed to insert row into current_nozzle after multiple attempts. Plugin initialization may be"
-                        "incomplete.")
-        except Exception as e:
-            self._logger.error(f"Error adding nozzle to the database: {e}")
-
-        try:
-            retries = 0
-            cursor = self._conn.cursor()
+            cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM nozzles")
             count = cursor.fetchone()[0]
             if count == 0:
                 while retries < 3:
                     try:
-                        self.add_nozzle_to_database(0.4)
+                        self.nozzle.add_nozzle_to_database(0.4)
                         break
                     except sqlite3.OperationalError as e:
                         self._logger.warning(f"Database operation failed: {e}")
@@ -244,58 +282,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
                 if retries == 3:
                     self._logger.error(
-                        "Failed to insert row into current_nozzle after multiple attempts. Plugin initialization may "
+                        "Failed to insert row into current_selections after multiple attempts. Plugin initialization "
+                        "may "
                         "be incomplete.")
         except Exception as e:
             self._logger.error(f"Error adding nozzle to the database: {e}")
 
-    def get_current_nozzle_size(self):
-        nozzle_id = self.get_current_nozzle_id()
-
-        if nozzle_id is not None:
-            con = self.get_db()
-            cursor = con.cursor()
-            # Extract the ID from the fetched row
-
-            # Execute a SELECT query to retrieve the size based on the current nozzle ID
-            cursor.execute("SELECT size FROM nozzles WHERE id = ?", (nozzle_id,))
-            con.commit()
-            # Fetch the size corresponding to the current nozzle ID
-            result = cursor.fetchone()
-
-            # Return the size if found
-            return result[0] if result else None
-        else:
-            # Return None if no current nozzle ID was found
-            self._logger.error("No current nozzle ID found in the database")
-            return None
-
-    def get_current_nozzle_id(self):
-        # Create a cursor to execute SQL queries
-        con = self.get_db()
-        cursor = con.cursor()
-
-        # Execute a SELECT query to retrieve the current nozzle ID
-        cursor.execute("SELECT nozzle_id FROM current_nozzle WHERE id = 1")
-
-        # Fetch the current nozzle ID
-        data_id = cursor.fetchone()
-        con.commit()
-
-        return data_id[0] if data_id else None
-
-    def remove_nozzle_from_database(self, nozzle_id):
-        con = self.get_db()
-        cursor = con.cursor()
-        cursor.execute("DELETE FROM nozzles WHERE id = ?", (nozzle_id,))
-        con.commit()
-
-        # Check if the removed nozzle was the current nozzle
-        current_nozzle_id = self.get_current_nozzle_id()
-        if current_nozzle_id == nozzle_id:
-            cursor.execute("UPDATE current_nozzle SET nozzle_id = ? WHERE id = ?",
-                           (1, 1))  # Assuming there's only one current nozzle
-            con.commit()
+        conn.close()
 
     def on_event(self, event, payload):
         if event == Events.PRINT_STARTED:
@@ -329,13 +322,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
     def get_loaded_filament(self):
         try:
             if self._spool_manager is None:
-                self._logger.warning("Spool Manager plugin is not installed. Filament type will not be checked.")
+                self._logger.warning("Spool Manager plugin is not installed. Filament alert_type will not be checked.")
                 return -1
 
             materials = self._spool_manager.get_materials()
 
             if not materials:
-                self._logger.warning("No filament selected in Spool Manager. Filament type will not be checked.")
+                self._logger.warning("No filament selected in Spool Manager. Filament alert_type will not be checked.")
                 return None
 
             # Assuming the first loaded filament is the currently used one
@@ -346,7 +339,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             return -2
 
     def parse_gcode(self, file_path):
-        # Regular expression patterns to extract nozzle diameter and filament type
+        # Regular expression patterns to extract nozzle diameter and filament alert_type
         nozzle_pattern = re.compile(r'; nozzle_diameter = (\d+\.\d+)')
         filament_pattern = re.compile(r'; filament_type = (.+)')
 
@@ -372,7 +365,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             # Read the last 100 lines
             lines = file.readlines()
 
-            # Extract nozzle diameter and filament type from the collected lines
+            # Extract nozzle diameter and filament alert_type from the collected lines
             gcode_content = ''.join(lines)
             nozzle_match = nozzle_pattern.search(gcode_content)
             filament_match = filament_pattern.search(gcode_content)
@@ -403,11 +396,11 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         # for details.
         return {
             "Nozzle_Filament_Validator": {
-                "displayName": "Nozzle_filament_validator Plugin",
+                "displayName": "Nozzle Filament Validator Plugin",
                 "displayVersion": self._plugin_version,
 
                 # version check: github repository
-                "type": "github_release",
+                "alert_type": "github_release",
                 "user": "Rylan-Meilutis",
                 "repo": "OctoPrint-Nozzle-Filament-Validator",
                 "current": self._plugin_version,

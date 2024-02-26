@@ -1,6 +1,8 @@
 # OctoPrint-Nozzle-Filament-Validator
 
-**TODO:** Describe what your plugin does.
+This plugin validates nozzle size, build plate, and filament type before starting a print.
+It uses provided gcode setting to work, it is not a replacement for checking yourself but can help to prevent simple 
+mistakes from occurring
 
 ## Setup
 
@@ -9,9 +11,9 @@ or manually using this URL:
 
     https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator/archive/master.zip
 
-**TODO:** Describe how to install your plugin, if more needs to be done than just installing it via pip or through
-the plugin manager.
 
 ## Configuration
-
-**TODO:** Describe your plugin's configuration options (if any).
+Go to plugin settings and set your nozzle size, and build plate.
+filament type should be set automatically if you have spool manager installed and have set the filament type for the 
+spool.
+When you go to print it will check if the gcode settings match the settings you have set.

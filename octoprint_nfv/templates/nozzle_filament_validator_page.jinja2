@@ -2,7 +2,7 @@
     <h1>Nozzle Filament Validator</h1>
 
     <div>
-        <strong>Current Filament Type:</strong>&nbsp;<span id="current-filament"></span>&nbsp;&nbsp;
+        <strong>Current Filament Type:</strong><span id="current-filament"></span>&nbsp;&nbsp;
         <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
     </div>
 
@@ -10,6 +10,15 @@
     <div>
         <strong>Current Nozzle Size:</strong> <span id="current-nozzle"></span>
         <br><br>
+    </div>
+
+    <!-- Display the current Build Plate -->
+    <div>
+        <strong>Current Build plate:</strong> <span id="current-build-plate"></span>:&nbsp;&nbsp;<span
+            id="current-build-plate-filaments"></span>
+
+        <br><br>
+
     </div>
 
     <!-- Input for adding a new nozzle -->
@@ -30,4 +39,35 @@
     <div class="form-group">
         <button id="remove-nozzle-button" class="btn btn-danger">Remove Nozzle</button>
     </div>
+
+    <!-- Select dropdown for choosing current build plate -->
+    <div class="form-group">
+        <label for="build-plate-list">Select Current Build Plate:</label>
+        <select id="build-plate-list" class="form-control"></select>
+        <button id="select-build-plate-button" class="btn btn-success">Select Build Plate</button>
+    </div>
+
+    <!-- Button to remove selected build plate -->
+    <div class="form-group">
+        <button id="remove-build-plate-button" class="btn btn-danger">Remove Build Plate</button>
+    </div>
+
+    <!-- Input for adding a new build plate -->
+    <div class="form-group">
+        <label for="build-plate-input">Add New Build Plate:</label>
+        <input type="text" class="form-control" id="build-plate-input" placeholder="Enter build plate name">
+        <!-- add edit button to edit the currently selected build_plate and add a grid of checkboxes for the compatible
+        filaments -->
+        <div id="compatible-filaments-checkboxes">
+            <!-- Dynamic checkboxes will be added here -->
+        </div>
+        <div class="form-check">
+            <br>
+            <input class="form-check-input" type="checkbox" id="edit-build-plate-checkbox">
+            <label class="form-check-label" for="edit-build-plate-checkbox">Edit Selected Build Plate</label>
+        </div>
+        <button id="add-build-plate-button" class="btn btn-primary">Add Build Plate</button>
+    </div>
+
+
 </div>
