@@ -5,97 +5,72 @@ id: Nozzle_Filament_Validator
 title: OctoPrint-Nozzle-Filament-Validator
 description: Validate nozzle size and filament type before starting a print.
 authors:
-- Rylan Meilutis
+  - Rylan Meilutis
 license: AGPLv3
 
-# TODO
-date: today's date in format YYYY-MM-DD, e.g. 2015-04-21
+date: 2024-02-26
 
 homepage: https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator
 source: https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator
 archive: https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator/archive/master.zip
 
-# TODO
-# Set this to true if your plugin uses the dependency_links setup parameter to include
-# library versions not yet published on PyPi. SHOULD ONLY BE USED IF THERE IS NO OTHER OPTION!
-#follow_dependency_links: false
-
-# TODO
 tags:
-- a list
-- of tags
-- that apply
-- to your plugin
-- (take a look at the existing plugins for what makes sense here)
+  - filament
+  - error checking
+  - print validation
+  - nozzle size checking
+  - build plate checking
 
-# TODO
 # When registering a plugin on plugins.octoprint.org, all screenshots should be uploaded not linked from external sites.
 screenshots:
-- url: url of a screenshot, /assets/img/...
-  alt: alt-text of a screenshot
-  caption: caption of a screenshot
-- url: url of another screenshot, /assets/img/...
-  alt: alt-text of another screenshot
-  caption: caption of another screenshot
-- ...
+  - url: /assets/img/plugins/Nozzle_Filament_Validator/settings_page.png
+    alt: the settings page
+    caption: The settings page for the plugin.
+  - url: /assets/img/plugins/Nozzle_Filament_Validator/caught_error.png
+    alt: the notification of an error
+    caption: An example notification of an error. This one is for incorrect filament type.
+  - url: /assets/img/plugins/Nozzle_Filament_Validator/success.png
+    alt: notification of a successful validation
+    caption: An example notification of a successful validation.
 
-# TODO
-featuredimage: url of a featured image for your plugin, /assets/img/...
-
-# TODO
-# You only need the following if your plugin requires specific OctoPrint versions or
-# specific operating systems to function - you can safely remove the whole
-# "compatibility" block if this is not the case.
+featuredimage: /assets/img/plugins/Nozzle_Filament_Validator/settings_page.png
 
 compatibility:
 
-  # List of compatible versions
-  #
-  # A single version number will be interpretated as a minimum version requirement,
-  # e.g. "1.3.1" will show the plugin as compatible to OctoPrint versions 1.3.1 and up.
-  # More sophisticated version requirements can be modelled too by using PEP440
-  # compatible version specifiers.
-  #
-  # You can also remove the whole "octoprint" block. Removing it will default to all
-  # OctoPrint versions being supported.
-
   octoprint:
-  - 1.4.0
-
-  # List of compatible operating systems
-  #
-  # Valid values:
-  #
-  # - windows
-  # - linux
-  # - macos
-  # - freebsd
-  #
-  # There are also two OS groups defined that get expanded on usage:
-  #
-  # - posix: linux, macos and freebsd
-  # - nix: linux and freebsd
-  #
-  # You can also remove the whole "os" block. Removing it will default to all
-  # operating systems being supported.
+    - 1.9.3
 
   os:
-  - linux
-  - windows
-  - macos
-  - freebsd
-
-  # Compatible Python version
-  #
-  # It is recommended to only support Python 3 for new plugins, in which case this should be ">=3,<4"
-  # 
-  # Plugins that wish to support both Python 2 and 3 should set it to ">=2.7,<4".
-  #
-  # Plugins that only support Python 2 will not be accepted into the plugin repository.
-
-  python: ">=3,<4"
+    - linux
+    - windows
+    - macos
+    - freebsd
+  python: ">=3.10,<4"
 
 ---
 
-**TODO**: Longer description of your plugin, configuration examples etc. This part will be visible on the page at
-http://plugins.octoprint.org/plugin/Nozzle_Filament_Validator/
+# OctoPrint-Nozzle-Filament-Validator
+
+This plugin validates nozzle size, build plate, and filament type before starting a print.
+It uses provided gcode setting to work, it is not a replacement for checking yourself but
+can help to prevent simple
+mistakes from occurring.
+
+## Needed plugins
+
+- [Spool Manager](https://plugins.octoprint.org/plugins/SpoolManager/) - This plugin will
+  automatically set the filament type for the spool if you have it installed and have set
+  the filament type for the spool.
+
+## Configuration
+
+Go to plugin settings and set your nozzle size, and build plate.
+Filament type should be set automatically if you have spool manager installed and have set
+the filament type for the
+spool.
+When you go to print, the plugin will check if the gcode settings match the settings you
+have set, and that the current filament is supported by the selected build plate. If it
+does not match, it will notify you of the error. If it does match, it will notify you of a
+successful validation.
+
+

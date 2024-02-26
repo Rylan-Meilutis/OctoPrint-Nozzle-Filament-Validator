@@ -14,6 +14,10 @@ or manually using this URL:
 
 ## Configuration
 Go to plugin settings and set your nozzle size, and build plate.
-filament type should be set automatically if you have spool manager installed and have set the filament type for the 
+Filament type should be set automatically if you have spool manager installed and have set
+the filament type for the
 spool.
-When you go to print it will check if the gcode settings match the settings you have set.
+When you go to print, the plugin will check if the gcode settings match the settings you
+have set, and that the current filament is supported by the selected build plate. If it
+does not match, it will notify you of the error. If it does match, it will notify you of a
+successful validation.

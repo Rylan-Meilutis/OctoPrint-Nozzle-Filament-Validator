@@ -187,7 +187,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         if (gcode_info["filament_type"].lower() != str(loaded_filament).lower() and gcode_info["filament_type"] is not
                 None and filament_passed is not False):
             self._logger.error("Print aborted: Incorrect filament alert_type")
-            self.send_alert("Print aborted: Incorrect filament alert_type", "error")
+            self.send_alert("Print aborted: Incorrect filament type", "error")
             self._printer.cancel_print()
             return
 
@@ -217,7 +217,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                 return
 
         if nozzle_passed and filament_passed and build_plate_passed:
-            self.send_alert("Print passed nozzle and filament check", "info")
+            self.send_alert("Print passed nozzle and filament check", "success")
             self._logger.info("Print passed nozzle and filament check...")
 
     def initialize(self):
@@ -261,33 +261,39 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             except Exception as error:
                 self._logger.error(f"Error adding nozzle to the database: {error}")
 
+        def add_row_to_db(column: str, insert_function: callable, params: tuple):
+            try:
+                retries = 0
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM ?", (column,))
+                count = cursor.fetchone()[0]
+                if count == 0:
+                    while retries < 3:
+                        try:
+                            insert_function(*params)
+                            break
+                        except sqlite3.OperationalError as e:
+                            self._logger.warning(f"Database operation failed: {e}")
+                            self._logger.warning("Retrying...")
+                            retries += 1
+                            time.sleep(1)  # Wait for 1 second before retrying
+
+                    if retries == 3:
+                        self._logger.error(
+                            "Failed to insert row into current_selections after multiple attempts. Plugin "
+                            "initialization "
+                            "may "
+                            "be incomplete.")
+            except Exception as e:
+                self._logger.error(f"Error adding nozzle to the database: {e}")
+
+        # Check if the nozzle and build plate columns exist in the current_selections table
         check_and_insert_to_db("nozzle")
         check_and_insert_to_db("build_plate")
-
-        try:
-            retries = 0
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM nozzles")
-            count = cursor.fetchone()[0]
-            if count == 0:
-                while retries < 3:
-                    try:
-                        self.nozzle.add_nozzle_to_database(0.4)
-                        break
-                    except sqlite3.OperationalError as e:
-                        self._logger.warning(f"Database operation failed: {e}")
-                        self._logger.warning("Retrying...")
-                        retries += 1
-                        time.sleep(1)  # Wait for 1 second before retrying
-
-                if retries == 3:
-                    self._logger.error(
-                        "Failed to insert row into current_selections after multiple attempts. Plugin initialization "
-                        "may "
-                        "be incomplete.")
-        except Exception as e:
-            self._logger.error(f"Error adding nozzle to the database: {e}")
-
+        # Add default nozzle and build plate to the database
+        add_row_to_db("nozzles", self.nozzle.add_nozzle_to_database, (0.4,))
+        add_row_to_db("build_plates", self.build_plate.insert_build_plate_to_database,
+                     ("Generic", "PLA, PETG, ABS", "1"))
         conn.close()
 
     def on_event(self, event, payload):

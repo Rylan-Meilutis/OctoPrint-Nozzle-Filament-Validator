@@ -103,13 +103,22 @@ $(function () {
                     theme = "info";
                     break;
                 case "error":
+                    theme = 'error';
+                    break;
+                case "danger":
                     theme = 'danger';
                     break;
                 case "info":
                     theme = "info";
                     break;
                 case "tmp_error":
+                    theme = "error";
+                    break;
+                case "tmp_danger":
                     theme = "danger";
+                    break;
+                case "success":
+                    theme = "success";
                     break;
                 default:
                     theme = "info";
@@ -121,7 +130,7 @@ $(function () {
                     title: 'Nozzle Filament Validator',
                     text: data.msg,
                     type: theme,
-                    hide: data.type === 'info' || data.type === 'tmp_error',
+                    hide: data.type === 'info' || data.type === 'tmp_error' || data.type === 'tmp_danger' || data.type === 'success' ,
                     buttons: {closer: true, sticker: false}
                 });
             }
