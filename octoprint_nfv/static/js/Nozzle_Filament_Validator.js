@@ -1,12 +1,13 @@
 const PLUGIN_ID = "Nozzle_Filament_Validator";
 
+function sleep(time) {
+    return new Promise(resolve => setTimeout(resolve, time));
+}
+
 // Function to fetch and display added nozzles, filament alert_type, and current nozzle size
 function displayData() {
-    $.ajax({
-        url: API_BASEURL + "plugin/" + PLUGIN_ID,
-        type: "GET",
-        dataType: "json",
-        success: function (response) {
+    OctoPrint.simpleApiGet(PLUGIN_ID).done(
+        function (response) {
             // Display the list of added nozzles
             $("#nozzles-list").empty();
             $.each(response.nozzles, function (index, nozzle) {
@@ -76,19 +77,12 @@ function displayData() {
             });
 
             $("#compatible-filaments-checkboxes").append(checkboxContainer); // Append the container to the main container
-
-        },
-        error: function (xhr, status, error) {
-            console.error("Error fetching data:", error);
-        }
-    });
+            initialLoad = true;
+        });
 }
 
 
 $(function () {
-// Initial display of added nozzles, filament alert_type, and current nozzle size
-    displayData();
-
 // Bind the plugin message handler to the global scope
     function messageHandler() {
 
@@ -142,5 +136,12 @@ $(function () {
         additionalNames: ["messageHandler"],
         dependencies: ["loginStateViewModel", "appearanceViewModel"],
         elements: [""]
+    });
+
+    // Initial display of added nozzles, filament alert_type, and current nozzle size
+    
+    //sleep to avoid 404 errors
+    sleep(500).then(() => {
+        displayData();
     });
 });
