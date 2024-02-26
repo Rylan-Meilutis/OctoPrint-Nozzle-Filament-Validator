@@ -130,7 +130,7 @@ $(function () {
                     title: 'Nozzle Filament Validator',
                     text: data.msg,
                     type: theme,
-                    hide: data.type === 'info' || data.type === 'tmp_error' || data.type === 'tmp_danger' || data.type === 'success' ,
+                    hide: data.type === 'info' || data.type === 'tmp_error' || data.type === 'tmp_danger' || data.type === 'success',
                     buttons: {closer: true, sticker: false}
                 });
             }

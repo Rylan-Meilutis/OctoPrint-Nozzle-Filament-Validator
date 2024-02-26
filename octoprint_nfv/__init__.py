@@ -305,7 +305,9 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                     # Get full path to local file
                     path = self._file_manager.path_on_disk(FileDestinations.LOCAL, path)
                 selected_file = path
-            self.check_print(selected_file)
+
+            with self._printer.job_on_hold():
+                self.check_print(selected_file)
 
     ##~~ TemplatePlugin mixin
 

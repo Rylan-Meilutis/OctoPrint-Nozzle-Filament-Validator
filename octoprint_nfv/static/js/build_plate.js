@@ -6,16 +6,8 @@ $(function () {
             if (this.checked) {
                 const selectedBuildPlateId = $("#build-plate-list").val();
                 // Fetch the current build plate data
-                $.ajax({
-                    url: API_BASEURL + "plugin/" + PLUGIN_ID,
-                    type: "POST",
-                    contentType: "application/json; charset=UTF-8",
-                    dataType: "json",
-                    data: JSON.stringify({
-                        "command": "get_build_plate",
-                        "buildPlateId": selectedBuildPlateId
-                    }),
-                    success: function (response) {
+                OctoPrint.simpleApiCommand(PLUGIN_ID, "get_build_plate", {"buildPlateId": selectedBuildPlateId})
+                    .done(function (response) {
                         let filaments = [];
                         if (response.filaments) {
                             filaments = response.filaments.split(",");
@@ -32,11 +24,7 @@ $(function () {
                         } else {
                             console.error("Compatible filaments is invalid:", filaments);
                         }
-                    },
-                    error: function (xhr, status, error) {
-                        console.error("Error fetching build plate data:", error);
-                    }
-                });
+                    });
             } else {
                 // Clear the input fields and uncheck all checkboxes
                 $("#build-plate-input").val("");
@@ -55,22 +43,11 @@ $(function () {
 
 // Function to remove a build_plate
     function removeBuildPlate(buildPlateID) {
-        $.ajax({
-            url: API_BASEURL + "plugin/" + PLUGIN_ID,
-            type: "POST",
-            contentType: "application/json; charset=UTF-8",
-            dataType: "json",
-            data: JSON.stringify({
-                "command": "remove_build_plate",
-                "buildPlateId": buildPlateID
-            }),
-            success: function (response) {
+
+        OctoPrint.simpleApiCommand(PLUGIN_ID, "remove_build_plate", {"buildPlateId": buildPlateID})
+            .done(function (response) {
                 displayData();
-            },
-            error: function (xhr, status, error) {
-                console.error("Error removing build plate:", error);
-            }
-        });
+            });
     }
 
 // Event handler for adding a build_plate
@@ -84,58 +61,28 @@ $(function () {
         });
         compatibleFilaments = compatibleFilaments.replace(/,\s*$/, "");
 
-
         // Remove trailing comma
         let id = $("#build-plate-list").val();
         const isEditChecked = $("#edit-build-plate-checkbox").prop("checked");
-
 
         // Update id based on the value of the edit checkbox
         if (!isEditChecked) {
             id = "null";
         }
 
-        $.ajax({
-            url: API_BASEURL + "plugin/" + PLUGIN_ID,
-            type: "POST",
-            contentType: "application/json; charset=UTF-8",
-            dataType: "json",
-            data: JSON.stringify({
-                "command": "add_build_plate",
-                "name": buildPlateName,
-                "compatibleFilaments": compatibleFilaments,
-                "id": id
-            }),
-            success: function (response) {
-                displayData();
-            },
-            error: function (xhr, status, error) {
-                console.error("Error adding build plate: " + buildPlateName, error);
-            }
+        OctoPrint.simpleApiCommand(PLUGIN_ID, "add_build_plate", {
+            "name": buildPlateName,
+            "compatibleFilaments": compatibleFilaments,
+            "id": id
+        }).done(function (response) {
+            displayData();
         });
     });
 
 // Event handler for selecting the current sized build_plate
     $("#select-build-plate-button").click(function () {
         const selectedBuildPlateId = $("#build-plate-list").val();
-        $.ajax({
-            url: API_BASEURL + "plugin/" + PLUGIN_ID,
-            type: "POST",
-            contentType: "application/json; charset=UTF-8",
-            dataType: "json",
-            data: JSON.stringify({
-                "command": "select_build_plate",
-                "buildPlateId": selectedBuildPlateId
-            }),
-
-            success: function (response) {
-                displayData()
-                // Optionally, perform any UI update after selecting the nozzle
-            },
-            error: function (xhr, status, error) {
-                console.error("Error selecting build plate: " + selectedBuildPlateId, error);
-            }
-        });
+        OctoPrint.simpleApiCommand(PLUGIN_ID, "select_build_plate", {"buildPlateId": selectedBuildPlateId})
     });
 
 // Event handler for removing a build_plate
