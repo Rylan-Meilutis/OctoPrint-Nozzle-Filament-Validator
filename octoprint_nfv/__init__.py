@@ -314,9 +314,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     def get_assets(self):
         return {
-            "js": ["js/Nozzle_Filament_Validator.js"],
+            "js": ["js/Nozzle_Filament_Validator.js", "js/nozzles.js", "js/build_plate.js", "js/filament.js"],
             "css": ["css/Nozzle_Filament_Validator.css"],
-            "less": ["less/Nozzle_Filament_Validator.less"]
         }
 
     def get_loaded_filament(self):
