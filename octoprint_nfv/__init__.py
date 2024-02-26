@@ -61,88 +61,87 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         if current_user.is_anonymous():
             return "Insufficient rights", 403
 
-        match command:
-            case "addNozzle":
-                nozzle_size = data["size"]
-                if nozzle_size is not None:
-                    try:
-                        self.nozzle.add_nozzle_to_database(nozzle_size)
-                    except Exception as e:
-                        self.send_alert(f"Error adding nozzle to the database: {e}", "error")
-                    return flask.jsonify(success=True)
-                else:
-                    return flask.abort(400)
+        if command == "addNozzle":
+            nozzle_size = data["size"]
+            if nozzle_size is not None:
+                try:
+                    self.nozzle.add_nozzle_to_database(nozzle_size)
+                except Exception as e:
+                    self.send_alert(f"Error adding nozzle to the database: {e}", "error")
+                return flask.jsonify(success=True)
+            else:
+                return flask.abort(400)
 
-            case "selectNozzle":
-                selected_nozzle_id = data.get("nozzleId")
-                if selected_nozzle_id is not None:
-                    try:
-                        self.nozzle.select_current_nozzle(selected_nozzle_id)
-                    except Exception as e:
-                        self.send_alert(f"Error selecting nozzle: {e}", "error")
-                    return flask.jsonify(success=True)
-                else:
-                    return flask.abort(400)
+        elif command == "selectNozzle":
+            selected_nozzle_id = data.get("nozzleId")
+            if selected_nozzle_id is not None:
+                try:
+                    self.nozzle.select_current_nozzle(selected_nozzle_id)
+                except Exception as e:
+                    self.send_alert(f"Error selecting nozzle: {e}", "error")
+                return flask.jsonify(success=True)
+            else:
+                return flask.abort(400)
 
-            case "removeNozzle":
-                nozzle_id = data.get("nozzleId")
-                if nozzle_id is not None:
-                    try:
-                        self.nozzle.remove_nozzle_from_database(nozzle_id)
-                    except Exception as e:
-                        self.send_alert(f"Error removing nozzle from the database: {e}", "error")
-                    return flask.jsonify(success=True)
-                else:
-                    return flask.abort(400)
+        elif command == "removeNozzle":
+            nozzle_id = data.get("nozzleId")
+            if nozzle_id is not None:
+                try:
+                    self.nozzle.remove_nozzle_from_database(nozzle_id)
+                except Exception as e:
+                    self.send_alert(f"Error removing nozzle from the database: {e}", "error")
+                return flask.jsonify(success=True)
+            else:
+                return flask.abort(400)
 
-            case "add_build_plate":
-                name = data["name"]
-                compatible_filaments = data["compatibleFilaments"]
-                db_position = data.get("id") if data.get("id") is not None or data.get("id") != "" else None
-                if name is not None and compatible_filaments is not None:
-                    try:
-                        self.build_plate.insert_build_plate_to_database(name, compatible_filaments, db_position)
-                    except Exception as e:
-                        self.send_alert(e, "tmp_error")
-                    return flask.jsonify(success=True)
-                else:
-                    return flask.abort(400)
+        elif command == "add_build_plate":
+            name = data["name"]
+            compatible_filaments = data["compatibleFilaments"]
+            db_position = data.get("id") if data.get("id") is not None or data.get("id") != "" else None
+            if name is not None and compatible_filaments is not None:
+                try:
+                    self.build_plate.insert_build_plate_to_database(name, compatible_filaments, db_position)
+                except Exception as e:
+                    self.send_alert(e, "tmp_error")
+                return flask.jsonify(success=True)
+            else:
+                return flask.abort(400)
 
-            case "select_build_plate":
-                selected_build_plate_id = data.get("buildPlateId")
-                if selected_build_plate_id is not None:
-                    try:
-                        self.build_plate.select_current_build_plate(selected_build_plate_id)
-                    except Exception as e:
-                        self.send_alert(f"Error selecting build_plate: {e}", "error")
-                    return flask.jsonify(success=True)
-                else:
-                    return flask.abort(400)
+        elif command == "select_build_plate":
+            selected_build_plate_id = data.get("buildPlateId")
+            if selected_build_plate_id is not None:
+                try:
+                    self.build_plate.select_current_build_plate(selected_build_plate_id)
+                except Exception as e:
+                    self.send_alert(f"Error selecting build_plate: {e}", "error")
+                return flask.jsonify(success=True)
+            else:
+                return flask.abort(400)
 
-            case "remove_build_plate":
-                selected_build_plate_id = data.get("buildPlateId")
-                if selected_build_plate_id is not None:
-                    try:
-                        self.build_plate.remove_build_plate_from_database(selected_build_plate_id)
-                    except Exception as e:
-                        self.send_alert(f"Error removing build_plate from the database: {e}", "error")
-                    return flask.jsonify(success=True)
-                else:
-                    return flask.abort(400)
+        elif command == "remove_build_plate":
+            selected_build_plate_id = data.get("buildPlateId")
+            if selected_build_plate_id is not None:
+                try:
+                    self.build_plate.remove_build_plate_from_database(selected_build_plate_id)
+                except Exception as e:
+                    self.send_alert(f"Error removing build_plate from the database: {e}", "error")
+                return flask.jsonify(success=True)
+            else:
+                return flask.abort(400)
 
-            case "get_build_plate":
-                selected_build_plate_id = data.get("buildPlateId")
-                if selected_build_plate_id is not None:
-                    try:
-                        current_build_plate = self.build_plate.get_build_plate_name_by_id(selected_build_plate_id)
-                        current_build_plate_filaments = str(self.build_plate.get_build_plate_filaments_by_id(
-                            selected_build_plate_id))
-                        return flask.jsonify(name=current_build_plate, filaments=current_build_plate_filaments)
-                    except Exception as e:
-                        self.send_alert(f"Error retrieving build_plate from the database: {e}", "tmp_error")
-                        return flask.abort(502)
-                else:
-                    return flask.abort(400)
+        elif command == "get_build_plate":
+            selected_build_plate_id = data.get("buildPlateId")
+            if selected_build_plate_id is not None:
+                try:
+                    current_build_plate = self.build_plate.get_build_plate_name_by_id(selected_build_plate_id)
+                    current_build_plate_filaments = str(self.build_plate.get_build_plate_filaments_by_id(
+                        selected_build_plate_id))
+                    return flask.jsonify(name=current_build_plate, filaments=current_build_plate_filaments)
+                except Exception as e:
+                    self.send_alert(f"Error retrieving build_plate from the database: {e}", "tmp_error")
+                    return flask.abort(502)
+            else:
+                return flask.abort(400)
 
         return flask.abort(400)
 
@@ -293,7 +292,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         # Add default nozzle and build plate to the database
         add_row_to_db("nozzles", self.nozzle.add_nozzle_to_database, (0.4,))
         add_row_to_db("build_plates", self.build_plate.insert_build_plate_to_database,
-                     ("Generic", "PLA, PETG, ABS", "1"))
+                      ("Generic", "PLA, PETG, ABS", "1"))
         conn.close()
 
     def on_event(self, event, payload):
