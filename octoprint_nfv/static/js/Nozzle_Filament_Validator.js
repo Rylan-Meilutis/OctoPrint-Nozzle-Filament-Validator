@@ -122,6 +122,11 @@ $(function () {
                     }
                 });
             }
+            else {
+                // Clear the input fields and uncheck all checkboxes
+                $("#build-plate-input").val("");
+                $("input[type='checkbox'][name='filament-checkbox']").prop('checked', false);
+            }
         }
     );
 

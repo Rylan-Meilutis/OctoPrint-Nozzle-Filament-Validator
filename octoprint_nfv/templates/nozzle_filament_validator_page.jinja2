@@ -2,25 +2,26 @@
     <h1>Nozzle Filament Validator</h1>
 
     <div>
-        <strong>Current Filament Type:</strong><span id="current-filament"></span>&nbsp;&nbsp;
+        <strong>Current Filament Type: </strong><span id="current-filament"></span>&nbsp;&nbsp;
         <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
     </div>
 
     <!-- Display the current nozzle size -->
     <div>
-        <strong>Current Nozzle Size:</strong> <span id="current-nozzle"></span>
-        <br><br>
+        <strong>Current Nozzle Size: </strong><span id="current-nozzle"></span>
+        <br>
     </div>
 
     <!-- Display the current Build Plate -->
     <div>
-        <strong>Current Build plate:</strong> <span id="current-build-plate"></span>:&nbsp;&nbsp;<span
-            id="current-build-plate-filaments"></span>
-
+        <strong>Current Build plate: </strong><span id="current-build-plate"></span>
+        <br>
+        <strong>Supported Materials: </strong><span id="current-build-plate-filaments"></span>
         <br><br>
 
     </div>
-
+    <hr>
+    <strong>Nozzle Settings:</strong>
     <!-- Input for adding a new nozzle -->
     <div class="form-group">
         <label for="nozzle-size-input">Add New Nozzle Size:</label>
@@ -39,7 +40,9 @@
     <div class="form-group">
         <button id="remove-nozzle-button" class="btn btn-danger">Remove Nozzle</button>
     </div>
-
+    <br>
+    <hr>
+    <strong>Build Plate Settings:</strong>
     <!-- Select dropdown for choosing current build plate -->
     <div class="form-group">
         <label for="build-plate-list">Select Current Build Plate:</label>
@@ -58,6 +61,7 @@
         <input type="text" class="form-control" id="build-plate-input" placeholder="Enter build plate name">
         <!-- add edit button to edit the currently selected build_plate and add a grid of checkboxes for the compatible
         filaments -->
+        <label for="compatible-filaments-checkboxes">Check supported materials:</label>
         <div id="compatible-filaments-checkboxes">
             <!-- Dynamic checkboxes will be added here -->
         </div>
