@@ -139,7 +139,7 @@ $(function () {
     });
 
     // Initial display of added nozzles, filament alert_type, and current nozzle size
-    
+
     //sleep to avoid 404 errors
     sleep(500).then(() => {
         displayData();

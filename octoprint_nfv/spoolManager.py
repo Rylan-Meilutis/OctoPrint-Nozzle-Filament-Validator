@@ -1,5 +1,6 @@
-from octoprint.server import app
 import json
+
+from octoprint.server import app
 
 
 class SpoolManagerException(Exception):

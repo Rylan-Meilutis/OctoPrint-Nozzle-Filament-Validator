@@ -23,7 +23,7 @@ class build_plate:
         return [{"id": row[0], "name": row[1], "compatible_filaments": row[2].replace(" ", "").split(",")} for row in
                 cursor.fetchall()]
 
-    def insert_build_plate_to_database(self, name, compatible_filaments, id:str = "null"):
+    def insert_build_plate_to_database(self, name, compatible_filaments, id: str = "null"):
         try:
             con = get_db(self.data_folder)
             cursor = con.cursor()
@@ -146,4 +146,3 @@ class build_plate:
             return filament_type in build_plate_filaments
         else:
             return False
-
