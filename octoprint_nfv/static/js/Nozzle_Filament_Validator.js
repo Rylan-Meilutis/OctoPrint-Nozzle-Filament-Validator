@@ -198,8 +198,8 @@ $(function () {
 
 // Event handler for removing a nozzle
     $("#remove-nozzle-button").click(function () {
-        const selectedNozzleId = $("#build-plate-list").val();
-        const selectedNozzleSize = $("#build-plate-list option:selected").text();
+        const selectedNozzleId = $("#nozzles-list").val();
+        const selectedNozzleSize = $("#nozzles-list option:selected").text();
         confirmRemoveNozzle(selectedNozzleId, selectedNozzleSize);
     });
 
