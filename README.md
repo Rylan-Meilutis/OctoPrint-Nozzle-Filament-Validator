@@ -21,3 +21,9 @@ When you go to print, the plugin will check if the gcode settings match the sett
 have set, and that the current filament is supported by the selected build plate. If it
 does not match, it will notify you of the error. If it does match, it will notify you of a
 successful validation.
+
+## In Development
+
+- add support for multi color single nozzle printers
+
+- add support for multi tool head printers
