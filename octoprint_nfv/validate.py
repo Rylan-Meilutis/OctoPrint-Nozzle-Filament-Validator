@@ -155,13 +155,13 @@ class validator:
                     self.send_alert("Error retrieving loaded filament, filament error checking won't be performed",
                                     "info")
                     filament_passed = False
-
-                if (filament_types[i].lower() != str(loaded_filament).lower() and gcode_info[
-                    "filament_type"][i] is not
-                        None and filament_passed is not False):
-                    self.send_alert(f"Print aborted: Incorrect filament type on extruder {i + 1}", "error")
-                    self._printer.cancel_print()
-                    return
+                if filament_passed:
+                    if (filament_types[i].lower() != str(loaded_filament).lower() and gcode_info[
+                        "filament_type"][i] is not
+                            None):
+                        self.send_alert(f"Print aborted: Incorrect filament type on extruder {i + 1}", "error")
+                        self._printer.cancel_print()
+                        return
 
                 # Check if the loaded nozzle size matches the nozzle size in the GCODE
                 if nozzles[i] is None and nozzle_passed:
@@ -173,13 +173,14 @@ class validator:
                                     "info")
                     nozzle_passed = False
 
-                if (float(nozzles[i]) != float(self.extruders.get_nozzle_size_for_extruder(i + 1)) and
-                        nozzles[i] is
-                        not None and nozzle_passed is not False):
-                    self._logger.error(f"Print aborted: Incorrect nozzle size on extruder {i + 1}")
-                    self.send_alert(f"Print aborted: Incorrect nozzle size on extruder {i + 1}", "error")
-                    self._printer.cancel_print()
-                    return
+                if nozzle_passed:
+                    if (float(nozzles[i]) != float(self.extruders.get_nozzle_size_for_extruder(i + 1)) and
+                            nozzles[i] is
+                            not None):
+                        self._logger.error(f"Print aborted: Incorrect nozzle size on extruder {i + 1}")
+                        self.send_alert(f"Print aborted: Incorrect nozzle size on extruder {i + 1}", "error")
+                        self._printer.cancel_print()
+                        return
 
                 # Check if the build plate is compatible with the loaded filament
                 if filament_types[i] is not None:
@@ -194,10 +195,13 @@ class validator:
             if nozzle_passed and filament_passed and build_plate_passed:
                 self.send_alert("Print passed nozzle and filament check", "success")
                 self._logger.info("Print passed nozzle and filament check...")
+            else:
+                self.send_alert("Not all checks passed, please check your config and press resume to continue.", "info")
+                self._printer.pause_print()
 
         except Exception as e:
             self.send_alert(f"An error occurred while running checks, please report this error on github. \n"
-                            f"Error: {e}\n please check your config and press resume to continue.",
+                            f"Error: \"{e}\" \n please check your config and press resume to continue.",
                             "error")
             self._printer.pause_print()
             return

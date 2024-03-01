@@ -300,16 +300,16 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     def on_event(self, event, payload,):
         if event == Events.PRINT_STARTED:
-            self._logger.info("detected print_start_event")
-            selected_file = payload.get("file", "")
-            if not selected_file:
-                path = payload.get("path", "")
-                if payload.get("origin") == "local":
-                    # Get full path to local file
-                    path = self._file_manager.path_on_disk(FileDestinations.LOCAL, path)
-                selected_file = path
+            with self._printer.job_on_hold(blocking=True):
+                self._logger.info("detected print_start_event")
+                selected_file = payload.get("file", "")
+                if not selected_file:
+                    path = payload.get("path", "")
+                    if payload.get("origin") == "local":
+                        # Get full path to local file
+                        path = self._file_manager.path_on_disk(FileDestinations.LOCAL, path)
+                    selected_file = path
 
-            with self._printer.job_on_hold():
                 self.validator.check_print(selected_file)
 
         if "PrinterProfile" in event or event == Events.CONNECTED:
