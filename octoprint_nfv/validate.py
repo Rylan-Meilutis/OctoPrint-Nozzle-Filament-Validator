@@ -55,6 +55,20 @@ def parse_gcode(file_path):
         "printer_model": printer_model}
 
 
+def ends_with_mmu(string):
+    match_1 = re.match(r".*mmu.{1,2}$", string)
+    match_2 = re.match(r".*mmu.{1,2}is$", string)
+    return bool(match_1 or match_2)
+
+
+def match_ends_with_mmu(string):
+    match = re.match(r"^(.*?)(mmu.{1,2})(is)?$", string)
+    if match:
+        return match.group(1)
+    else:
+        return None
+
+
 class validator:
     def __init__(self, nozzle, build_plate, extruders, spool_manager, printer, logger, plugin_manager, identifier,
                  printer_profile_manager):
@@ -78,15 +92,32 @@ class validator:
         nozzle_passed = True
         filament_passed = True
         build_plate_passed = True
+        mmu_single_mode = False
         gcode_info = parse_gcode(file_path)
         printer_model = gcode_info["printer_model"]
-        if printer_model is not None and printer_model != self.get_printer_model() and printer_model != "":
-            self.send_alert(f"Print aborted: Incorrect printer model, {printer_model} found in gcode but "
-                            f"{self.get_printer_model()} is set.", "error")
-            self._printer.cancel_print()
-            return
-        elif printer_model is None:
+
+        if printer_model is None:
             self.send_alert("No printer model found in GCODE, printer model checking won't be performed", "tmp_error")
+
+        elif (printer_model is not None and printer_model.lower() != self.get_printer_model().lower() and printer_model
+              != ""):
+            invalid = True
+            if ends_with_mmu(self.get_printer_model().lower()):
+                self.send_alert(f"Printing in single mode for the MMU", "info")
+                invalid = self.get_printer_model().lower().replace("mmu", "") != printer_model.lower()
+                mmu_single_mode = True
+            if self.get_printer_model().lower().endswith("is"):
+                self.send_alert(f"Printing with non InputShaping profile on a printer that supports input shaping",
+                                "info")
+                invalid = self.get_printer_model().lower()[:-2] != printer_model.lower()
+                if invalid:
+                    invalid = match_ends_with_mmu(self.get_printer_model().lower()) != printer_model.lower()
+
+            if invalid:
+                self.send_alert(f"Print aborted: Incorrect printer model, {printer_model} found in gcode but "
+                                f"{self.get_printer_model()} is set.", "error")
+                self._printer.cancel_print()
+                return
 
         # Retrieve the loaded filament alert_type from spool manager
         try:
@@ -106,7 +137,7 @@ class validator:
             self._printer.cancel_print()
 
             return
-        elif len(nozzles) < self.extruders.get_number_of_extruders():
+        elif len(nozzles) < self.extruders.get_number_of_extruders() and not mmu_single_mode:
             self.send_alert(
                 f"Number of nozzles in gcode ({len(nozzles)}) is shorter than the number of extruders("
                 f"{self.extruders.get_number_of_extruders()}). Press RESUME to continue", "info")
@@ -119,7 +150,7 @@ class validator:
                 f"({len(filament_types)})", "error")
             self._printer.cancel_print()
             return
-        elif len(filament_types) < self.extruders.get_number_of_extruders():
+        elif len(filament_types) < self.extruders.get_number_of_extruders() and not mmu_single_mode:
             self.send_alert(
                 f"loaded filaments ({len(loaded_filaments)}) is longer than the number specified in the gcode ("
                 f"{len(filament_types)}). "
