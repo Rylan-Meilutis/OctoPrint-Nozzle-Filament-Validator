@@ -226,7 +226,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self.extruders = extruders.extruders(self.nozzle, self.get_plugin_data_folder(), self._logger,
                                              self._printer_profile_manager)
         self.validator = validate.validator(self.nozzle, self.build_plate, self.extruders, self._spool_manager,
-                                            self._printer, self._logger, self._plugin_manager, self._identifier)
+                                            self._printer, self._logger, self._plugin_manager, self._identifier,
+                                            self._printer_profile_manager)
 
         # Retry inserting a row into current_selections with a maximum of 3 attempts
         def check_and_insert_to_db(column: str, value: any = 1):
@@ -296,7 +297,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self.extruders.update_data()
         conn.close()
 
-    def on_event(self, event, payload):
+    def on_event(self, event, payload,):
         if event == Events.PRINT_STARTED:
             self._logger.info("detected print_start_event")
             selected_file = payload.get("file", "")
@@ -310,7 +311,12 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             with self._printer.job_on_hold():
                 self.validator.check_print(selected_file)
 
-        if event == Events.SETTINGS_UPDATED or "PrinterProfile" in event:
+        # if event == Events.SETTINGS_UPDATED:
+        #     if "PrinterProfile" in payload:
+        #         self.extruders.update_data()
+        #         self.send_alert("", "reload")
+
+        if "PrinterProfile" in event or event == Events.CONNECTED:
             self.extruders.update_data()
             self.send_alert("", "reload")
 

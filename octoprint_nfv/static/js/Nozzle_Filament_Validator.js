@@ -23,7 +23,7 @@ function createExtruderTabs(extrudersArray, response) {
     $('#myTabs').empty();
 
     $('#myTabs').append(`
-        <li class="nav-item">
+        <li class="nav-item active" id="#general-info-tab">
             <a class="nav-link active" data-toggle="tab" href="#general-info-tab">General</a>
         </li>
     `);
@@ -87,7 +87,7 @@ function createExtruderTabs(extrudersArray, response) {
         let extruderFilamentType = extruder.filamentType || "Filament type not available";
 
         $('#myTabs').append(`
-            <li class="nav-item">
+            <li class="nav-item" id="#extruder-${extruderPosition}">
                 <a class="nav-link" data-toggle="tab" href="#extruder-${extruderPosition}">Extruder ${extruderPosition}</a>
             </li>
         `);
@@ -126,7 +126,9 @@ function createExtruderTabs(extrudersArray, response) {
     //the id of activeTabId to active
     if (activeTabId !== "") {
         $('#extruder-tabs').children().removeClass('active');
+        $('#myTabs').children().removeClass('active');
         $(`#${activeTabId}`).addClass('active');
+        $('#myTabs li[id="#' + activeTabId + '"]').addClass('active');
 
     }
 
