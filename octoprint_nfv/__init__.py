@@ -284,7 +284,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                             "may "
                             "be incomplete.")
             except Exception as e:
-                self._logger.error(f"Error adding nozzle to the database: {e}")
+                self._logger.error(f"Error adding to the database: {e}")
 
         # Check if the nozzle and build plate columns exist in the current_selections table
         check_and_insert_to_db("build_plate")
@@ -292,6 +292,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         add_row_to_db("nozzles", self.nozzle.add_nozzle_to_database, (0.4,))
         add_row_to_db("build_plates", self.build_plate.insert_build_plate_to_database,
                       ("Generic", "PLA, PETG, ABS", "1"))
+
         add_row_to_db("extruders", self.extruders.add_extruder_to_database, (1, 1))
 
         self.extruders.update_data()

@@ -22,7 +22,7 @@ class extruders:
             con = get_db(self.data_folder)
             cursor = con.cursor()
 
-            if not self.is_multi_tool_head():
+            if not self.is_multi_tool_head() and extruder_position > 1:
                 nozzle_id = self.get_nozzle_id_for_extruder(1)
 
             cursor.execute("INSERT INTO extruders (nozzle_id, extruder_position) VALUES (?, ?)",
