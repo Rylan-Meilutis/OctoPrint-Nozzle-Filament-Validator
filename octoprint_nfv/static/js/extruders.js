@@ -10,6 +10,7 @@ function activate_extruder_buttons(response) {
         }).done(function (response) {
             // Update the current nozzle size for the current extruder
             $(`#current-nozzle-${extruderPosition}`).text(selectedNozzleSize); // Update the current nozzle size displayed on the page
+            displayData();
         });
     });
 }
