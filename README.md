@@ -27,3 +27,6 @@ successful validation.
 - add support for multi color single nozzle printers
 
 - add support for multi tool head printers
+
+# nozzle diameter is separated by commas and filament types are separated by a semi colon in the gcode
+

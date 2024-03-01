@@ -1,5 +1,12 @@
-$(function () {
+function activate_build_plate_buttons(response) {
 
+    $("#build-plate-list").empty();
+    $.each(response.build_plates, function (index, plate) {
+        $("#build-plate-list").append($("<option>", {
+            value: plate.id,
+            text: plate.name
+        }));
+    });
 
     // Function to update the name and compatible filaments when the edit button is checked
     $("#edit-build-plate-checkbox").change(function () {
@@ -82,7 +89,9 @@ $(function () {
 // Event handler for selecting the current sized build_plate
     $("#select-build-plate-button").click(function () {
         const selectedBuildPlateId = $("#build-plate-list").val();
-        OctoPrint.simpleApiCommand(PLUGIN_ID, "select_build_plate", {"buildPlateId": selectedBuildPlateId})
+        OctoPrint.simpleApiCommand(PLUGIN_ID, "select_build_plate", {"buildPlateId": selectedBuildPlateId}).done(function (response) {
+            displayData();
+        });
     });
 
 // Event handler for removing a build_plate
@@ -91,4 +100,18 @@ $(function () {
         const selectedBuildPlateName = $("#build-plate-list option:selected").text();
         confirmRemoveBuildPlate(selectedBuildPlateId, selectedBuildPlateName);
     });
-});
+
+    $("#compatible-filaments-checkboxes").empty(); // Clear existing checkboxes
+
+    const checkboxContainer = $("<div>").addClass("checkbox-container"); // Create a container for checkboxes
+
+    response.filaments.forEach(function (filament) {
+        const checkbox = $("<input>").attr("type", "checkbox").attr("id", "filament-" + filament).attr("name", "filament-checkbox").val(filament);
+        const label = $("<label>").attr("for", "filament-" + filament).text(filament);
+        const div = $("<div>").append(checkbox, label);
+        checkboxContainer.append(div); // Append each checkbox to the container
+    });
+
+    $("#compatible-filaments-checkboxes").append(checkboxContainer); // Append the container to the main container
+
+}

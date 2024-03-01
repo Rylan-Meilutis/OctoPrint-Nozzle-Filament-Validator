@@ -46,17 +46,37 @@ class SpoolManagerIntegration:
             )
         return json.loads(r.data)
 
+    def get_loaded_filament(self):
+        try:
+            materials = self.get_materials()
+            if materials:
+                # Assuming the first loaded filament is the currently used one
+                loaded_filament = materials[0]
+                return loaded_filament
+            else:
+                return None  # No filament loaded
+        except Exception as e:
+            self._logger.error(f"Error retrieving loaded filament: {e}")
+            return None
 
-def get_loaded_filament(self):
-    try:
-        spool_manager = SpoolManagerIntegration(self._impl, self._logger)
-        materials = spool_manager.get_materials()
-        if materials:
+    def get_loaded_filaments(self):
+        try:
+            if self._impl is None:
+                self._logger.warning("Spool Manager plugin is not installed. Filament alert_type will not be checked.")
+                return -1
+
+            materials = self.get_materials()
+
+            if not materials:
+                self._logger.warning("No filament selected in Spool Manager. Filament alert_type will not be checked.")
+                return None
+
             # Assuming the first loaded filament is the currently used one
-            loaded_filament = materials[0]
-            return loaded_filament
-        else:
-            return None  # No filament loaded
-    except Exception as e:
-        self._logger.error(f"Error retrieving loaded filament: {e}")
-        return None
+            filaments = []
+            for material in materials:
+                filaments.append(material.split("_")[0])
+
+            return filaments if len(filaments) > 0 else None
+        except Exception as e:
+            self._logger.error(f"Error retrieving loaded filament: {e}")
+            return -2
