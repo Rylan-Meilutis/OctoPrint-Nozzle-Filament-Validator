@@ -312,11 +312,6 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             with self._printer.job_on_hold():
                 self.validator.check_print(selected_file)
 
-        # if event == Events.SETTINGS_UPDATED:
-        #     if "PrinterProfile" in payload:
-        #         self.extruders.update_data()
-        #         self.send_alert("", "reload")
-
         if "PrinterProfile" in event or event == Events.CONNECTED:
             self.extruders.update_data()
             self.send_alert("", "reload")

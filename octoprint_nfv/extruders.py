@@ -80,9 +80,6 @@ class extruders:
         cursor.execute("UPDATE extruders SET extruder_position = ? WHERE id = ?", (extruder_position, extruder_id))
         con.commit()
 
-    def is_multi_extruder(self):
-        return self._printer_profile_manager.get_current_or_default()['extruder']['count'] > 1
-
     def is_multi_tool_head(self):
         # check if the printer has multiple tool heads using the octoprint API and make sure they use different nozzles
         printer_profile = self._printer_profile_manager.get_current_or_default()
