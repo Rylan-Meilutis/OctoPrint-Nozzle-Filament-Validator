@@ -22,10 +22,15 @@ have set, and that the current filament is supported by the selected build plate
 does not match, it will notify you of the error. If it does match, it will notify you of a
 successful validation.
 
+## Multi Extruder Support
+
+When configured in octoprint, this plugin supports multi material printers. It will check filament type on each extruder
+and nozzle size on each extruder (if your printer has more than 1 nozzle). It will also check the build plate for all
+filaments being used. If any of the extruders do not match the settings, it will notify you of the error and cancel the
+print.
+
 ## In Development
+Nothing major at the moment, just bug fixes, removing unused functions, and other minor improvements.
 
-- add support for multi color single nozzle printers
-
-- add support for multi tool head printers
 
 

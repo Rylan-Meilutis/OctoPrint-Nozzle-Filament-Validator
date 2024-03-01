@@ -32,10 +32,12 @@ function createExtruderTabs(extrudersArray, response) {
         <div id="general-info-tab" class="tab-pane show active">
             <!-- General information will be displayed here -->
             <strong>Current Build Plate: </strong><span id="current-build-plate"></span><br>
-            <strong>Supported Materials: </strong><span id="current-build-plate-filaments"></span><br><br>
+            <strong>Supported Materials: </strong><span id="current-build-plate-filaments"></span><br><hr>
+            
             <div class="form-group">
+                <strong>Nozzle Settings</strong>
                 <label for="nozzle-size-input">Add New Nozzle Size:</label>
-                <input type="number" class="form-control" id="nozzle-size-input" placeholder="Enter nozzle size">
+                <input type="number" class="form-control" id="nozzle-size-input" placeholder="Enter nozzle size" step="0.2">
                 <button id="add-nozzle-button" class="btn btn-primary">Add Nozzle</button>
             </div>
 
@@ -45,8 +47,9 @@ function createExtruderTabs(extrudersArray, response) {
 
                 <button id="remove-nozzle-button" class="btn btn-danger">Remove Nozzle</button>
             </div>
-            
+            <hr>
             <div class="form-group">
+                <strong>Build Plate Settings</strong>
                  <label for="build-plate-list">Select Current Build Plate:</label>
                  <select id="build-plate-list" class="form-control"></select>
                  <button id="select-build-plate-button" class="btn btn-success">Select Build Plate</button>
@@ -56,7 +59,7 @@ function createExtruderTabs(extrudersArray, response) {
             <div class="form-group">
                 <button id="remove-build-plate-button" class="btn btn-danger">Remove Build Plate</button>
             </div>
-
+            
             <!-- Input for adding a new build plate -->
             <div class="form-group">
                 <label for="build-plate-input">Add New Build Plate:</label>
@@ -69,6 +72,7 @@ function createExtruderTabs(extrudersArray, response) {
                 </div>
                 <div class="form-check">
                     <br>
+                    <hr>
                     <input class="form-check-input" type="checkbox" id="edit-build-plate-checkbox">
                     <label class="form-check-label" for="edit-build-plate-checkbox">Edit Selected Build Plate</label>
                 </div>
@@ -92,15 +96,15 @@ function createExtruderTabs(extrudersArray, response) {
         $('#extruder-tabs').append(`
             <div class="tab-pane" id="extruder-${extruderPosition}">
                 <div>
+                    <strong>Filament Type: </strong><span>${extruderFilamentType}</span>&nbsp;&nbsp;
+                    <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
+                    <hr>
                     <strong>Nozzle Size: </strong><span>${extruderNozzleSize}</span>
                     <br>
                     <label for="nozzle-dropdown-${extruderPosition}">Select Nozzle:</label>
                     <select id="nozzle-dropdown-${extruderPosition}" class="form-control" ${nozzleDropdownDisabled}>
                     </select>
-                    <button id="select-nozzle-button-${extruderPosition}" class="btn btn-success">Select Nozzle</button>
-                    <br>
-                    <strong>Filament Type: </strong><span>${extruderFilamentType}</span>&nbsp;&nbsp;
-                    <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
+                    <button id="select-nozzle-button-${extruderPosition}" class="btn btn-success">Select Nozzle</button>   
                 </div>
             </div>
         `);
@@ -132,7 +136,6 @@ function createExtruderTabs(extrudersArray, response) {
         //check if data isn't blank and is a child of the extruder-tabs div
         if (data !== "" && $(`#${data}`).parent().attr('id') === "extruder-tabs") {
             activeTabId = data;
-            console.log("Active tab:", activeTabId);
         }
 
     });
