@@ -1,77 +1,13 @@
 <div class="container">
     <h1>Nozzle Filament Validator</h1>
 
-    <div>
-        <strong>Current Filament Type: </strong><span id="current-filament"></span>&nbsp;&nbsp;
-        <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
-    </div>
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs" id="myTabs">
+        <!-- Tabs will be added dynamically -->
+    </ul>
 
-    <!-- Display the current nozzle size -->
-    <div>
-        <strong>Current Nozzle Size: </strong><span id="current-nozzle"></span>
-        <br>
+    <!-- Placeholder for dynamically added tabs content -->
+    <div class="tab-content" id="extruder-tabs">
+        <!-- Content for extruder tabs will be added dynamically -->
     </div>
-
-    <!-- Display the current Build Plate -->
-    <div>
-        <strong>Current Build plate: </strong><span id="current-build-plate"></span>
-        <br>
-        <strong>Supported Materials: </strong><span id="current-build-plate-filaments"></span>
-        <br><br>
-
-    </div>
-    <hr>
-    <strong>Nozzle Settings:</strong>
-    <!-- Input for adding a new nozzle -->
-    <div class="form-group">
-        <label for="nozzle-size-input">Add New Nozzle Size:</label>
-        <input type="number" class="form-control" id="nozzle-size-input" placeholder="Enter nozzle size">
-        <button id="add-nozzle-button" class="btn btn-primary">Add Nozzle</button>
-    </div>
-
-    <!-- Select dropdown for choosing current nozzle -->
-    <div class="form-group">
-        <label for="nozzles-list">Select Current Nozzle:</label>
-        <select id="nozzles-list" class="form-control"></select>
-        <button id="select-nozzle-button" class="btn btn-success">Select Nozzle</button>
-    </div>
-
-    <!-- Button to remove selected nozzle -->
-    <div class="form-group">
-        <button id="remove-nozzle-button" class="btn btn-danger">Remove Nozzle</button>
-    </div>
-    <br>
-    <hr>
-    <strong>Build Plate Settings:</strong>
-    <!-- Select dropdown for choosing current build plate -->
-    <div class="form-group">
-        <label for="build-plate-list">Select Current Build Plate:</label>
-        <select id="build-plate-list" class="form-control"></select>
-        <button id="select-build-plate-button" class="btn btn-success">Select Build Plate</button>
-    </div>
-
-    <!-- Button to remove selected build plate -->
-    <div class="form-group">
-        <button id="remove-build-plate-button" class="btn btn-danger">Remove Build Plate</button>
-    </div>
-
-    <!-- Input for adding a new build plate -->
-    <div class="form-group">
-        <label for="build-plate-input">Add New Build Plate:</label>
-        <input type="text" class="form-control" id="build-plate-input" placeholder="Enter build plate name">
-        <!-- add edit button to edit the currently selected build_plate and add a grid of checkboxes for the compatible
-        filaments -->
-        <label for="compatible-filaments-checkboxes">Check supported materials:</label>
-        <div id="compatible-filaments-checkboxes">
-            <!-- Dynamic checkboxes will be added here -->
-        </div>
-        <div class="form-check">
-            <br>
-            <input class="form-check-input" type="checkbox" id="edit-build-plate-checkbox">
-            <label class="form-check-label" for="edit-build-plate-checkbox">Edit Selected Build Plate</label>
-        </div>
-        <button id="add-build-plate-button" class="btn btn-primary">Add Build Plate</button>
-    </div>
-
-
 </div>

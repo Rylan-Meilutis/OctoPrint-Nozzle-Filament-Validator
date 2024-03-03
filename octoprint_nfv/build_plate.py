@@ -30,21 +30,29 @@ class build_plate:
             if id == "null":
                 # Check if the nozzle size already exists in the database
                 cursor.execute("SELECT name FROM build_plates WHERE name = ?", (str(name),))
-                existing_size = cursor.fetchone()
+                name_exists = cursor.fetchone()
                 con.commit()
 
                 # If the name already exists, log an error
-                if existing_size:
-                    self._logger.error(f"build plate name{name} already exists in the database")
-                    raise Exception(f"build plate name{name} already exists in the database")
+                if name_exists:
+                    self._logger.error(f"build plate name {name} already exists in the database")
+                    raise Exception(f"build plate name {name} already exists in the database")
                 else:
                     # Otherwise, insert the nozzle size into the database
                     cursor.execute("INSERT INTO build_plates (name, compatible_filaments) VALUES (?, ?)",
                                    (str(name), str(compatible_filaments)))
                     con.commit()
             else:
-                cursor.execute("UPDATE build_plates SET name = ?, compatible_filaments = ? WHERE id = ?",
-                               (str(name), str(compatible_filaments), int(id)))
+
+                cursor.execute("SELECT id FROM build_plates WHERE id = ?", (str(id),))
+                id_exists = cursor.fetchone()
+                con.commit()
+                if id_exists:
+                    cursor.execute("UPDATE build_plates SET name = ?, compatible_filaments = ? WHERE id = ?",
+                                   (str(name), str(compatible_filaments), int(id)))
+                else:
+                    cursor.execute("INSERT INTO build_plates (name, compatible_filaments, id) VALUES (?, ?, ?)",
+                                   (str(name), str(compatible_filaments), int(id)))
                 con.commit()
         except Exception as e:
             self._logger.error(f"Error adding build plate to the database: {e}")
