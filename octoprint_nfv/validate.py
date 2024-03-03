@@ -7,7 +7,8 @@ def parse_gcode(file_path):
     nozzle_pattern = re.compile(r'; nozzle_diameter = ((?:\d+\.\d+,?)+)')
     filament_pattern = re.compile(r'; filament_type = (.+)')
     used_filament_pattern = re.compile(r'; filament used \[mm] = (.+)')
-    printer_model = re.compile(r'; printer_model = (.+)')
+    printer_model_pattern = re.compile(r'; printer_model = (.+)')
+    skip_validation_pattern = re.compile(r'; skip_validation(.*)')
 
     # Number of lines to read from the end of the file
     num_lines = 1000
@@ -36,11 +37,13 @@ def parse_gcode(file_path):
         nozzle_match = nozzle_pattern.search(gcode_content)
         filament_match = filament_pattern.search(gcode_content)
         filament_used_match = used_filament_pattern.search(gcode_content)
-        printer_model_match = printer_model.search(gcode_content)
+        printer_model_match = printer_model_pattern.search(gcode_content)
+        skip_validation_match = skip_validation_pattern.search(gcode_content)
         nozzle_size = None
         filament_type = None
         filament_used = None
         printer_model = None
+        skip_validation = False
         if nozzle_match:
             nozzle_size = nozzle_match.group(1).strip().split(',')
         if filament_match:
@@ -49,10 +52,12 @@ def parse_gcode(file_path):
             filament_used = filament_used_match.group(1).strip("").split(',')
         if printer_model_match:
             printer_model = printer_model_match.group(1).strip()
+        if skip_validation_match:
+            skip_validation = True
 
     return {
         "nozzle_size": nozzle_size, "filament_type": filament_type, "filament_used": filament_used,
-        "printer_model": printer_model}
+        "printer_model": printer_model, "skip_validation": skip_validation}
 
 
 def ends_with_mmu(string):
@@ -105,11 +110,16 @@ class validator:
                             f"anyways", "error")
             self._printer.pause_print()
             return
+
         nozzle_passed = True
         filament_passed = True
         mmu_single_mode = False
         gcode_info = parse_gcode(file_path)
         printer_model = gcode_info["printer_model"]
+        skip_validation = gcode_info["skip_validation"]
+
+        if skip_validation:
+            return
 
         if printer_model is None:
             self.send_alert("No printer model found in GCODE, printer model checking won't be performed", "info")

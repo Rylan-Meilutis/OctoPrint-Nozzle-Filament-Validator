@@ -34,6 +34,9 @@ Filament type should be set automatically if you have spool manager installed an
 the filament type for the spool.
 If you do not have spool manager installed, filament type will not be checked.
 
+If using a plugin that runs a .gcode file such as the continuous print queue plugin, You can skip gcode validation for that file by adding
+```; skip_validation``` anywhere in the gcode file (This works on all .gcode files so be careful when using it). 
+
 When you go to print, the plugin will check if the gcode settings match the settings you
 have set, and that the current filament is supported by the selected build plate. If it
 does not match, it will notify you of the error. If it does match, it will notify you of a
