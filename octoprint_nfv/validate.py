@@ -97,7 +97,7 @@ class validator:
         printer_model = gcode_info["printer_model"]
 
         if printer_model is None:
-            self.send_alert("No printer model found in GCODE, printer model checking won't be performed", "tmp_error")
+            self.send_alert("No printer model found in GCODE, printer model checking won't be performed", "info")
 
         elif (printer_model is not None and printer_model.lower() != self.get_printer_model().lower() and printer_model
               != ""):
