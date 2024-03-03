@@ -1,9 +1,6 @@
 # coding=utf-8
 from __future__ import absolute_import
 
-import logging
-import os
-import re
 import sqlite3
 import time
 
@@ -14,7 +11,9 @@ from octoprint.events import Events
 from octoprint.filemanager import FileDestinations
 
 import octoprint_nfv.build_plate as build_plate
+import octoprint_nfv.extruders as extruders
 import octoprint_nfv.nozzle as nozzle
+import octoprint_nfv.validate as validate
 from octoprint_nfv.db import get_db, init_db
 from octoprint_nfv.spoolManager import SpoolManagerIntegration
 
@@ -31,29 +30,35 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self._spool_manager = None
         self.nozzle = None
         self.build_plate = None
+        self.extruders = None
+        self.validator = None
 
     def get_api_commands(self):
         return dict(
             addNozzle=["size"],
-            selectNozzle=["nozzleId"],
             removeNozzle=["nozzleId"],
             add_build_plate=["name", "compatibleFilaments", "id"],
             select_build_plate=["buildPlateId"],
             remove_build_plate=["buildPlateId"],
-            get_build_plate=["buildPlateId"]
+            get_build_plate=["buildPlateId"],
+            update_extruder=["extruderPosition", "nozzleId"],
+            get_extruder_info=["extruderId"],
+            get_loaded_filaments=[]
         )
 
     def on_api_get(self, request):
         nozzles = self.nozzle.fetch_nozzles_from_database()
-        filament_type = self.get_loaded_filament()
-        current_nozzle = self.nozzle.get_current_nozzle_size()
+        number_of_extruders = self.extruders.get_number_of_extruders()
         build_plates = self.build_plate.fetch_build_plates_from_database()
         current_build_plate = self.build_plate.get_current_build_plate_name()
         current_build_plate_filaments = self.build_plate.get_current_build_plate_filaments()
         filaments = build_plate.get_filament_types()
-        return flask.jsonify(nozzles=nozzles, filament_type=filament_type, currentNozzle=current_nozzle,
+        is_multi_extruder = str(self.extruders.is_multi_tool_head())
+
+        return flask.jsonify(nozzles=nozzles, number_of_extruders=number_of_extruders,
                              build_plates=build_plates, currentBuildPlate=current_build_plate,
-                             currentBuildPlateFilaments=current_build_plate_filaments, filaments=filaments)
+                             currentBuildPlateFilaments=current_build_plate_filaments, filaments=filaments,
+                             isMultiExtruder=is_multi_extruder)
 
     def on_api_command(self, command, data):
         import flask
@@ -72,22 +77,11 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             else:
                 return flask.abort(400)
 
-        elif command == "selectNozzle":
-            selected_nozzle_id = data.get("nozzleId")
-            if selected_nozzle_id is not None:
-                try:
-                    self.nozzle.select_current_nozzle(selected_nozzle_id)
-                except Exception as e:
-                    self.send_alert(f"Error selecting nozzle: {e}", "error")
-                return flask.jsonify(success=True)
-            else:
-                return flask.abort(400)
-
         elif command == "removeNozzle":
-            nozzle_id = data.get("nozzleId")
-            if nozzle_id is not None:
+            nozzle_Size = data.get("nozzleId")
+            if nozzle_Size is not None:
                 try:
-                    self.nozzle.remove_nozzle_from_database(nozzle_id)
+                    self.nozzle.remove_nozzle_from_database(nozzle_Size)
                 except Exception as e:
                     self.send_alert(f"Error removing nozzle from the database: {e}", "error")
                 return flask.jsonify(success=True)
@@ -143,6 +137,72 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             else:
                 return flask.abort(400)
 
+        elif command == "add_extruder":
+            nozzle_Size = data.get("nozzleId")
+            extruder_position = data.get("extruderPosition")
+            if nozzle_Size is not None and extruder_position is not None:
+                try:
+                    self.extruders.add_extruder_to_database(nozzle_Size, extruder_position)
+                except Exception as e:
+                    self.send_alert(f"Error adding extruder to the database: {e}", "error")
+                return flask.jsonify(success=True)
+            else:
+                return flask.abort(400)
+
+        elif command == "update_extruder":
+            extruder_position = data.get("extruderPosition")
+            nozzle_id = data.get("nozzleId")
+            # extruder_id = data.get("extruderID")
+            if extruder_position is not None and nozzle_id is not None:
+                try:
+                    self.extruders.update_extruder(extruder_position=extruder_position, nozzle_id=nozzle_id)
+                except Exception as e:
+                    self.send_alert(f"Error updating extruder: {e}", "error")
+                return flask.jsonify(success=True)
+            else:
+                return flask.abort(400)
+        elif command == "remove_extruder":
+            extruder_id = data.get("extruderId")
+            if extruder_id is not None:
+                try:
+                    self.extruders.remove_extruder_from_database(extruder_position=extruder_id)
+                except Exception as e:
+                    self.send_alert(f"Error removing extruder from the database: {e}", "error")
+                return flask.jsonify(success=True)
+            else:
+                return flask.abort(400)
+        elif command == "get_extruder_info":
+            extruder_id = data.get("extruderId")
+            if extruder_id is not None:
+                try:
+                    nozzle_size = self.extruders.get_nozzle_size_for_extruder(extruder_id)
+                    extruder_position = extruder_id
+                    try:
+                        filament = self._spool_manager.get_loaded_filaments()[extruder_position - 1]
+                    except Exception:
+                        filament = None
+                    return flask.jsonify(nozzleSize=nozzle_size, extruderPosition=extruder_position,
+                                         filamentType=filament)
+                except Exception as e:
+                    self.send_alert(f"Error retrieving extruder info: {e}", "tmp_error")
+                    return flask.abort(500)
+        elif command == "get_loaded_filaments":
+            try:
+                filaments = str(self._spool_manager.get_loaded_filaments()).replace("[", "").replace("]", "")
+                return flask.jsonify(filaments=filaments)
+            except Exception as e:
+                self.send_alert(f"Error retrieving filament info: {e}", "tmp_error")
+                return flask.abort(500)
+        elif command == "set_multiple_tool_heads":
+            value = data.get("value")
+            if value is not None:
+                try:
+                    self.extruders.set_multiple_tool_heads(value.lower() == "true")
+                    return flask.jsonify()
+                except Exception as e:
+                    self.send_alert(f"Error setting multiple tool heads: {e}", "error")
+                    return flask.abort(500)
+
         return flask.abort(400)
 
     def send_alert(self, message, alert_type="popup"):
@@ -150,74 +210,6 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     def on_settings_save(self, data):
         octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
-
-    def check_print(self, file_path):
-        self._logger.setLevel(logging.INFO)
-        nozzle_passed = True
-        filament_passed = True
-        build_plate_passed = True
-        # Retrieve the loaded filament alert_type from spool manager
-        self._logger.info("Checking print for nozzle and filament settings...")
-        try:
-            loaded_filament = self.get_loaded_filament()
-        except Exception as e:
-            self.send_alert(f"Error retrieving loaded filament: {e}", "error")
-            return
-        # Parse the GCODE file to extract the nozzle size and filament alert_type
-        gcode_info = self.parse_gcode(file_path)
-
-        # Check if the loaded filament matches the filament alert_type in the GCODE
-        if gcode_info["filament_type"] is None:
-            self.send_alert("No filament alert_type found in GCODE, error checking won't be performed", "info")
-            filament_passed = False
-
-        elif loaded_filament is None:
-            self.send_alert("No filament loaded, error checking won't be performed", "info")
-            filament_passed = False
-
-        elif loaded_filament == -1:
-            self.send_alert("Spool Manager plugin is not installed. Filament alert_type will not be checked.", "info")
-            filament_passed = False
-
-        elif loaded_filament == -2:
-            self.send_alert("Error retrieving loaded filament, filament error checking won't be performed", "info")
-            filament_passed = False
-
-        if (gcode_info["filament_type"].lower() != str(loaded_filament).lower() and gcode_info["filament_type"] is not
-                None and filament_passed is not False):
-            self._logger.error("Print aborted: Incorrect filament alert_type")
-            self.send_alert("Print aborted: Incorrect filament type", "error")
-            self._printer.cancel_print()
-            return
-
-        # Check if the loaded nozzle size matches the nozzle size in the GCODE
-        if gcode_info["nozzle_size"] is None:
-            self.send_alert("No nozzle size found in GCODE, error checking won't be performed", "info")
-            nozzle_passed = False
-
-        elif self.nozzle.get_current_nozzle_size() is None:
-            self.send_alert("No nozzle selected, error checking won't be performed", "info")
-            nozzle_passed = False
-
-        if (float(gcode_info["nozzle_size"]) != float(self.nozzle.get_current_nozzle_size()) and gcode_info[
-            "nozzle_size"] is
-                not None and nozzle_passed is not False):
-            self._logger.error("Print aborted: Incorrect nozzle size")
-            self.send_alert("Print aborted: Incorrect nozzle size", "error")
-            self._printer.cancel_print()
-            return
-
-        # Check if the build plate is compatible with the loaded filament
-        if gcode_info["filament_type"] is not None:
-            if not self.build_plate.is_filament_compatible_with_build_plate(gcode_info["filament_type"]):
-                self._logger.error("Print aborted: Incompatible build plate")
-                self.send_alert("Print aborted: Incompatible build plate", "error")
-                self._printer.cancel_print()
-                return
-
-        if nozzle_passed and filament_passed and build_plate_passed:
-            self.send_alert("Print passed nozzle and filament check", "success")
-            self._logger.info("Print passed nozzle and filament check...")
 
     def initialize(self):
         conn = get_db(self.get_plugin_data_folder())
@@ -228,23 +220,28 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
         self.nozzle = nozzle.nozzle(self.get_plugin_data_folder(), self._logger)
         self.build_plate = build_plate.build_plate(self.get_plugin_data_folder(), self._logger)
+        self.extruders = extruders.extruders(self.nozzle, self.get_plugin_data_folder(), self._logger,
+                                             self._printer_profile_manager)
+        self.validator = validate.validator(self.nozzle, self.build_plate, self.extruders, self._spool_manager,
+                                            self._printer, self._logger, self._plugin_manager, self._identifier,
+                                            self._printer_profile_manager)
 
         # Retry inserting a row into current_selections with a maximum of 3 attempts
-        def check_and_insert_to_db(column: str):
+        def check_and_insert_to_db(column: str, value: any = 1):
             try:
                 retry = 0
                 index = conn.cursor()
 
-                # Check if the column already exists in the table schema
-                index.execute("SELECT COUNT(*) FROM pragma_table_info('current_selections') WHERE name = ?",
-                              (column,))
+                # Check if the table already exists in the table schema
+                index.execute("SELECT COUNT(*) FROM current_selections WHERE id = ?",
+                              (str(column),))
                 exists = index.fetchone()[0]
 
                 if not exists:
                     while retry < 3:
                         try:
                             index.execute("INSERT INTO current_selections (id, selection) VALUES (?, ?)",
-                                          (column, 1))
+                                          (column, value))
                             conn.commit()
                             break
                         except sqlite3.OperationalError as error:
@@ -260,13 +257,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             except Exception as error:
                 self._logger.error(f"Error adding nozzle to the database: {error}")
 
-        def add_row_to_db(column: str, insert_function: callable, params: tuple):
+        def add_row_to_db(table: str, insert_function: callable, params: tuple):
             try:
                 retries = 0
                 cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM ?", (column,))
+                cursor.execute(f"SELECT COUNT(*) FROM {table}")
                 count = cursor.fetchone()[0]
-                if count == 0:
+                if int(count) == 0:
                     while retries < 3:
                         try:
                             insert_function(*params)
@@ -284,32 +281,39 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                             "may "
                             "be incomplete.")
             except Exception as e:
-                self._logger.error(f"Error adding nozzle to the database: {e}")
+                self._logger.error(f"Error adding to the database: {e}")
 
         # Check if the nozzle and build plate columns exist in the current_selections table
-        check_and_insert_to_db("nozzle")
         check_and_insert_to_db("build_plate")
         # Add default nozzle and build plate to the database
         add_row_to_db("nozzles", self.nozzle.add_nozzle_to_database, (0.4,))
         add_row_to_db("build_plates", self.build_plate.insert_build_plate_to_database,
                       ("Generic", "PLA, PETG, ABS", "1"))
+
+        add_row_to_db("extruders", self.extruders.add_extruder_to_database, (1, 1))
+
+        self.extruders.update_data()
         conn.close()
 
-    def on_event(self, event, payload):
+    def on_event(self, event, payload,):
         if event == Events.PRINT_STARTED:
-            self._logger.info("detected print_start_event")
-            selected_file = payload.get("file", "")
-            if not selected_file:
-                path = payload.get("path", "")
-                if payload.get("origin") == "local":
-                    # Get full path to local file
-                    path = self._file_manager.path_on_disk(FileDestinations.LOCAL, path)
-                selected_file = path
+            with self._printer.job_on_hold(blocking=True):
+                self._logger.info("detected print_start_event")
+                selected_file = payload.get("file", "")
+                if not selected_file:
+                    path = payload.get("path", "")
+                    if payload.get("origin") == "local":
+                        # Get full path to local file
+                        path = self._file_manager.path_on_disk(FileDestinations.LOCAL, path)
+                    selected_file = path
 
-            with self._printer.job_on_hold():
-                self.check_print(selected_file)
+                self.validator.check_print(selected_file)
 
-    ##~~ TemplatePlugin mixin
+        if "PrinterProfile" in event or event == Events.CONNECTED:
+            self.extruders.update_data()
+            self.send_alert("", "reload")
+
+    # ~~ TemplatePlugin mixin
 
     def get_template_configs(self):
         return [
@@ -317,84 +321,26 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             # page
         ]
 
-    ##~~ AssetPlugin mixin
+    # ~~ AssetPlugin mixin
 
     def get_assets(self):
         return {
-            "js": ["js/Nozzle_Filament_Validator.js", "js/nozzles.js", "js/build_plate.js", "js/filament.js"],
+            "js": ["js/Nozzle_Filament_Validator.js", "js/nozzles.js", "js/build_plate.js", "js/filament.js",
+                   "js/extruders.js"],
             "css": ["css/Nozzle_Filament_Validator.css"],
         }
-
-    def get_loaded_filament(self):
-        try:
-            if self._spool_manager is None:
-                self._logger.warning("Spool Manager plugin is not installed. Filament alert_type will not be checked.")
-                return -1
-
-            materials = self._spool_manager.get_materials()
-
-            if not materials:
-                self._logger.warning("No filament selected in Spool Manager. Filament alert_type will not be checked.")
-                return None
-
-            # Assuming the first loaded filament is the currently used one
-            loaded_filament = materials[0]
-            return loaded_filament.split("_")[0] if loaded_filament is not None else None
-        except Exception as e:
-            self._logger.error(f"Error retrieving loaded filament: {e}")
-            return -2
-
-    def parse_gcode(self, file_path):
-        # Regular expression patterns to extract nozzle diameter and filament alert_type
-        nozzle_pattern = re.compile(r'; nozzle_diameter = (\d+\.\d+)')
-        filament_pattern = re.compile(r'; filament_type = (.+)')
-
-        # Number of lines to read from the end of the file
-        num_lines = 400
-
-        with open(file_path, 'r') as file:
-            # Move the file pointer to the end
-            file.seek(0, os.SEEK_END)
-            file_size = file.tell()
-            # Track the position in the file
-            pos = file_size - 1
-            newline_count = 0
-            # Read the file backwards until we find the last 100 lines or reach the beginning of the file
-            while pos > 0 and newline_count < num_lines:
-                file.seek(pos)
-                char = file.read(1)
-                if char == '\n':
-                    newline_count += 1
-                    if newline_count == num_lines:
-                        break
-                pos -= 1
-            # Read the last 100 lines
-            lines = file.readlines()
-
-            # Extract nozzle diameter and filament alert_type from the collected lines
-            gcode_content = ''.join(lines)
-            nozzle_match = nozzle_pattern.search(gcode_content)
-            filament_match = filament_pattern.search(gcode_content)
-            nozzle_size = None
-            filament_type = None
-            if nozzle_match:
-                nozzle_size = float(nozzle_match.group(1))
-            if filament_match:
-                filament_type = filament_match.group(1).strip()
-
-        return {"nozzle_size": nozzle_size, "filament_type": filament_type}
 
     def on_after_startup(self):
         self._logger.info("NozzleFilamentValidatorPlugin initialized")
 
-    ##~~ SettingsPlugin mixin
+    # ~~ SettingsPlugin mixin
 
     def get_settings_defaults(self):
         return {
             # put your plugin's default settings here
         }
 
-    ##~~ Softwareupdate hook
+    # ~~ Softwareupdate hook
 
     def get_update_information(self):
         # Define the configuration for your plugin to use with the Software Update
