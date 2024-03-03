@@ -176,14 +176,11 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             if extruder_id is not None:
                 try:
                     nozzle_size = self.extruders.get_nozzle_size_for_extruder(extruder_id)
-                    self._logger.info(f"nozzle_size: {nozzle_size}")
                     extruder_position = extruder_id
-                    self._logger.info(f"extruder_position: {extruder_position}")
                     try:
                         filament = self._spool_manager.get_loaded_filaments()[extruder_position - 1]
                     except Exception:
                         filament = None
-                    self._logger.info(f"filament: {filament}")
                     return flask.jsonify(nozzleSize=nozzle_size, extruderPosition=extruder_position,
                                          filamentType=filament)
                 except Exception as e:

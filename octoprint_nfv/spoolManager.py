@@ -74,7 +74,10 @@ class SpoolManagerIntegration:
             # Assuming the first loaded filament is the currently used one
             filaments = []
             for material in materials:
-                filaments.append(material.split("_")[0])
+                try:
+                    filaments.append(material.split("_")[0])
+                except Exception:
+                    filaments.append(None)
 
             return filaments if len(filaments) > 0 else None
         except Exception as e:
