@@ -59,6 +59,4 @@ Nothing major at the moment, just bug fixes, removing unused functions, and othe
 -  Add the ability to auto scan new files for compatability when they are uploaded and remove them if they are not
 compatible
 -  Add the ability to scan all files and remove ones that aren't compatible
--  Add color checks to ensure the correct color is loaded in each extruder
-
 
