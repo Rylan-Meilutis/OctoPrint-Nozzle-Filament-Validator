@@ -295,7 +295,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self.extruders.update_data()
         conn.close()
 
-    def on_event(self, event, payload):
+    def on_event(self, event, payload,):
         if event == Events.PRINT_STARTED:
             with self._printer.job_on_hold(blocking=True):
                 self._logger.info("detected print_start_event")
