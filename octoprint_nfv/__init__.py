@@ -346,22 +346,33 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         # Define the configuration for your plugin to use with the Software Update
         # Plugin here. See https://docs.octoprint.org/en/master/bundledplugins/softwareupdate.html
         # for details.
-        return {
-            "Nozzle_Filament_Validator": {
-                "displayName": "Nozzle Filament Validator Plugin",
-                "displayVersion": self._plugin_version,
+
+        return dict(
+            Nozzle_Filament_Validator=dict(
+                displayName="Nozzle Filament Validator",
+                displayVersion=self._plugin_version,
 
                 # version check: github repository
-                "alert_type": "github_release",
-                "user": "Rylan-Meilutis",
-                "repo": "OctoPrint-Nozzle-Filament-Validator",
-                "current": self._plugin_version,
+                type="github_release",
+                user="Rylan-Meilutis",
+                repo="OctoPrint-Nozzle-Filament-Validator",
+                current=self._plugin_version,
+                stable_branch=dict(
+                    name="Stable", branch="main", comittish=["main"]
+                ),
+                prerelease_branches=[
+                    dict(
+                        name="Release Candidate",
+                        branch="dev",
+                        comittish=["rc", "main"],
+                    )
+                ],
 
                 # update method: pip
-                "pip": "https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator/archive/{"
-                       "target_version}.zip",
-            }
-        }
+                pip="https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator/archive/{"
+                    "target_version}.zip"
+            )
+        )
 
 
 # If you want your plugin to be registered within OctoPrint under a different name than what you defined in setup.py

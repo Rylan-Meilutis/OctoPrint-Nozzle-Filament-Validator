@@ -60,4 +60,3 @@ Nothing major at the moment, just bug fixes, removing unused functions, and othe
 compatible
 -  Add the ability to scan all files and remove ones that aren't compatible
 
-
