@@ -153,8 +153,8 @@ class validator:
                 filament_used) == 1):
             mmu_single_mode = True
             self.send_alert(
-                "MMU single mode detected, skipping filament checks, please make sure you pick the tool with the "
-                "correct filament", "info")
+                "MMU single mode detected, skipping filament checks, please make sure you pick a tool with "
+                f"{filament_types[0]} filament", "info")
 
         if len(nozzles) > self.extruders.get_number_of_extruders():
             self.send_alert(f"Number of nozzles ({len(nozzles)}) in the gcode is longer than the number of extruders "
