@@ -364,7 +364,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                     dict(
                         name="Release Candidate",
                         branch="dev",
-                        comittish=["rc", "main"],
+                        comittish=["dev", "main"],
                     )
                 ],
 
