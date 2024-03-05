@@ -19,9 +19,13 @@ function activate_build_plate_buttons(response) {
                         if (response.filaments) {
                             filaments = response.filaments.split(",");
                         }
+
+                        // Disable the dropdown while in editing mode
+                        $("#build-plate-list").prop('disabled', true);
                         // Update the input fields with the current values
                         $("#build-plate-input").val(response.name);
                         $("#add-build-plate-button").text("Update Build Plate");
+                        $("#add-build-plate-title").text("Update Build Plate:");
                         // Check the compatible filaments checkboxes
                         $("input[type='checkbox'][name='filament-checkbox']").prop('checked', false); // Uncheck all checkboxes first
                         if (filaments) {
@@ -37,6 +41,10 @@ function activate_build_plate_buttons(response) {
                 // Clear the input fields and uncheck all checkboxes
                 $("#build-plate-input").val("");
                 $("#add-build-plate-button").text("Add Build Plate");
+                $("#add-build-plate-title").text("Add New Build Plate:");
+                // Enable the dropdown when not in editing mode
+                $("#build-plate-list").prop('disabled', false);
+
 
                 $("input[type='checkbox'][name='filament-checkbox']").prop('checked', false);
             }
