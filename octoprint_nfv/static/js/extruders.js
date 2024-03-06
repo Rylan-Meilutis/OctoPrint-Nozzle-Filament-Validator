@@ -1,4 +1,7 @@
 function activate_extruder_buttons(response) {
+    // Remove any existing event handlers for selecting the nozzle
+    $("[id^='select-nozzle-button-']").off('click');
+
     // Event handler for selecting the current sized nozzle
     $("[id^='select-nozzle-button-']").click(function () {
         const extruderPosition = $(this).attr("id").split("-").pop(); // Get the extruder position from button ID

@@ -62,7 +62,7 @@ function createExtruderTabs(extrudersArray, response) {
             
             <!-- Input for adding a new build plate -->
             <div class="form-group">
-                <label for="build-plate-input">Add New Build Plate:</label>
+                <label id="add-build-plate-title" for="build-plate-input">Add New Build Plate:</label>
                 <input type="text" class="form-control" id="build-plate-input" placeholder="Enter build plate name">
                 <!-- add edit button to edit the currently selected build_plate and add a grid of checkboxes for the compatible
                 filaments -->
