@@ -22,6 +22,9 @@ function activate_build_plate_buttons(response) {
 
                         // Disable the dropdown while in editing mode
                         $("#build-plate-list").prop('disabled', true);
+                        $("#select-build-plate-button").prop('disabled', true);
+                        $("#remove-build-plate-button").prop('disabled', true);
+
                         // Update the input fields with the current values
                         $("#build-plate-input").val(response.name);
                         $("#add-build-plate-button").text("Update Build Plate");
@@ -44,6 +47,9 @@ function activate_build_plate_buttons(response) {
                 $("#add-build-plate-title").text("Add New Build Plate:");
                 // Enable the dropdown when not in editing mode
                 $("#build-plate-list").prop('disabled', false);
+                $("#select-build-plate-button").prop('disabled', false);
+                $("#remove-build-plate-button").prop('disabled', false);
+
 
 
                 $("input[type='checkbox'][name='filament-checkbox']").prop('checked', false);
