@@ -1,3 +1,7 @@
+.nozzle-filament-validator{
+  max-width: 100%
+}
+
 .checkbox-container {
     display: flex;
     flex-wrap: wrap;
