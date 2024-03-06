@@ -295,7 +295,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self.extruders.update_data()
         conn.close()
 
-    def on_event(self, event, payload,):
+    def on_event(self, event, payload, ):
         if event == Events.PRINT_STARTED:
             with self._printer.job_on_hold(blocking=True):
                 self._logger.info("detected print_start_event")
@@ -358,13 +358,20 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                 repo="OctoPrint-Nozzle-Filament-Validator",
                 current=self._plugin_version,
                 stable_branch=dict(
-                    name="Stable", branch="main", comittish=["main"]
+                    name="Stable",
+                    branch="main",
+                    commitish=["main"]
                 ),
                 prerelease_branches=[
                     dict(
                         name="Release Candidate",
+                        branch="rc",
+                        commitish=["rc", "main"]
+                    ),
+                    dict(
+                        name="Development",
                         branch="dev",
-                        comittish=["dev", "main"],
+                        commitish=["dev", "rc", "main"]
                     )
                 ],
 
