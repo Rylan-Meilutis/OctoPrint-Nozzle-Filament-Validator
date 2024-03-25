@@ -1,21 +1,38 @@
 from octoprint_nfv.db import get_db
+from typing import NoReturn, Any, Union
 
 
 def get_filament_types():
+    """
+    Get the filament types
+    :return: the available filament types
+    """
     return ["PLA", "PETG", "ASA", "ABS", "TPU", "Nylon", "PC", "Wood", "Metal", "Carbon Fiber", "PVA", "HIPS",
             "PETT", "PP", "PEI", "POM", "PMMA", "PBT", "PES", "PC-ABS", "PPO", "PEEK", "PEKK", "PEI", "PES"]
 
 
 class build_plate:
+    """
+    Class to handle the build plate settings and db
+    """
 
-    def __init__(self, data_folder, logger):
+    def __init__(self, data_folder: str, logger: Any):
+        """
+        Constructor
+        :param data_folder: data folder of the plugin
+        :param logger: logger for outputting errors
+        """
         super().__init__()
         self._conn = None
         self._spool_manager = None
         self.data_folder = data_folder
         self._logger = logger
 
-    def fetch_build_plates_from_database(self):
+    def fetch_build_plates_from_database(self) -> list[dict[str,Any]]:
+        """
+        Fetch all build plates from the database
+        :return: a list of all available build plates
+        """
         con = get_db(self.data_folder)
         cursor = con.cursor()
         cursor.execute("SELECT id, name, compatible_filaments FROM build_plates")
@@ -23,7 +40,14 @@ class build_plate:
         return [{"id": row[0], "name": row[1], "compatible_filaments": row[2].replace(" ", "").split(",")} for row in
                 cursor.fetchall()]
 
-    def insert_build_plate_to_database(self, name, compatible_filaments, id: str = "null"):
+    def insert_build_plate_to_database(self, name: str, compatible_filaments: str, id: str = "null") -> NoReturn:
+        """
+        Insert a build plate into the database
+        :param name: name of the build plate
+        :param compatible_filaments: compatible filaments
+        :param id: numerical build_plate_id of the build plate
+        :return: none
+        """
         try:
             con = get_db(self.data_folder)
             cursor = con.cursor()
@@ -57,14 +81,23 @@ class build_plate:
         except Exception as e:
             self._logger.error(f"Error adding build plate to the database: {e}")
 
-    def select_current_build_plate(self, selected_nozzle_id):
+    def select_current_build_plate(self, selected_build_plate_id: int) -> NoReturn:
+        """
+        Select the current build plate in the current selections db
+        :param selected_build_plate_id: the build_plate_id of the selected build plate
+        :return:
+        """
         con = get_db(self.data_folder)
         cursor = con.cursor()
         cursor.execute("UPDATE current_selections SET selection = ? WHERE id = 'build_plate'",
-                       (int(selected_nozzle_id),))  # Assuming there's only one current nozzle
+                       (int(selected_build_plate_id),))  # Assuming there's only one current nozzle
         con.commit()
 
-    def get_current_build_plate_name(self):
+    def get_current_build_plate_name(self) -> Union[str, None]:
+        """
+        Get the current build plate name
+        :return: the name of the current build plate or none if not found
+        """
         build_plate_id = self.get_current_build_plate_id()
 
         if build_plate_id is not None:
@@ -85,7 +118,11 @@ class build_plate:
             self._logger.error("No current build plate ID found in the database")
             return None
 
-    def get_current_build_plate_filaments(self):
+    def get_current_build_plate_filaments(self) -> Union[list[str], None]:
+        """
+        Get the current build plate filaments
+        :return: a list of the current build plate filaments or none if not found
+        """
         build_plate_id = self.get_current_build_plate_id()
 
         if build_plate_id is not None:
@@ -105,7 +142,11 @@ class build_plate:
             self._logger.error("No current build plate ID found in the database")
             return None
 
-    def get_current_build_plate_id(self):
+    def get_current_build_plate_id(self) -> Union[int, None]:
+        """
+        Get the current build plate ID
+        :return: the current build plate ID or none if not found
+        """
         # Create a cursor to execute SQL queries
         con = get_db(self.data_folder)
         cursor = con.cursor()
@@ -119,36 +160,56 @@ class build_plate:
 
         return data_id[0] if data_id else None
 
-    def remove_build_plate_from_database(self, nozzle_id):
+    def remove_build_plate_from_database(self, build_plate_id) -> NoReturn:
+        """
+        Remove a build plate from the database
+        :param build_plate_id: the build_plate_id of the build plate to remove
+        :return: Nothing
+        """
         con = get_db(self.data_folder)
         cursor = con.cursor()
-        cursor.execute("DELETE FROM build_plates WHERE id = ?", (nozzle_id,))
+        cursor.execute("DELETE FROM build_plates WHERE id = ?", (build_plate_id,))
         con.commit()
 
         # Check if the removed nozzle was the current nozzle
         current_nozzle_id = self.get_current_build_plate_id()
-        if current_nozzle_id == nozzle_id:
+        if current_nozzle_id == build_plate_id:
             cursor.execute("UPDATE current_selections SET selection = ? WHERE id = 'build_plate'",
                            (1, "nozzle"))  # Assuming there's only one current nozzle
             con.commit()
 
-    def get_build_plate_name_by_id(self, id):
+    def get_build_plate_name_by_id(self, build_plate_id: int) -> Union[str, None]:
+        """
+        Get the build plate name by the build plate ID
+        :param build_plate_id: the build plate ID
+        :return: the name of the build plate or none if not found
+        """
         con = get_db(self.data_folder)
         cursor = con.cursor()
-        cursor.execute("SELECT name FROM build_plates WHERE id = ?", (int(id),))
+        cursor.execute("SELECT name FROM build_plates WHERE id = ?", (int(build_plate_id),))
         con.commit()
         result = cursor.fetchone()
         return result[0] if result else None
 
-    def get_build_plate_filaments_by_id(self, id):
+    def get_build_plate_filaments_by_id(self, build_plate_id: int) -> Union[list[str], None]:
+        """
+        Get the build plate filaments by the build plate ID
+        :param build_plate_id: the build plate ID
+        :return: the list of compatible filaments or none if not found
+        """
         con = get_db(self.data_folder)
         cursor = con.cursor()
-        cursor.execute("SELECT compatible_filaments FROM build_plates WHERE id = ?", (int(id),))
+        cursor.execute("SELECT compatible_filaments FROM build_plates WHERE id = ?", (int(build_plate_id),))
         con.commit()
         result = cursor.fetchone()
         return str(result[0]).split(",") if result else None
 
-    def is_filament_compatible_with_build_plate(self, filament_type):
+    def is_filament_compatible_with_build_plate(self, filament_type: str) -> bool:
+        """
+        Check if the filament type is compatible with the current build plate
+        :param filament_type: the filament type to check
+        :return: true if the filament is compatible, false otherwise
+        """
         build_plate_filaments = self.get_current_build_plate_filaments()
         if build_plate_filaments is not None:
             return filament_type in build_plate_filaments

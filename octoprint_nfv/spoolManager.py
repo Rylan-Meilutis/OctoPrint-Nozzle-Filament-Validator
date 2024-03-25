@@ -1,4 +1,7 @@
 import json
+import logging
+from typing import Any
+from typing import Union
 
 from octoprint.server import app
 
@@ -8,11 +11,15 @@ class SpoolManagerException(Exception):
 
 
 class SpoolManagerIntegration:
-    def __init__(self, impl, logger):
+    def __init__(self, impl: Any, logger: logging.Logger) -> None:
         self._logger = logger
         self._impl = impl
 
-    def get_materials(self):
+    def get_materials(self) -> list[str]:
+        """
+        Get the materials from the Spool Manager
+        :return:
+        """
         try:
             materials = self._impl.api_getSelectedSpoolInformations()
             materials = [
@@ -28,7 +35,11 @@ class SpoolManagerIntegration:
             )
             return []
 
-    def allowed_to_print(self):
+    def allowed_to_print(self) -> dict[str, Any]:
+        """
+        Check if the printer is allowed to print
+        :return: the response from the Spool Manager
+        """
         with app.app_context():
             r = self._impl.allowed_to_print()
         if r.status_code != 200:
@@ -37,7 +48,11 @@ class SpoolManagerIntegration:
             )
         return json.loads(r.data)
 
-    def start_print_confirmed(self):
+    def start_print_confirmed(self) -> dict[str, Any]:
+        """
+        Start of a print job confirmed
+        :return: information about the print job
+        """
         with app.app_context():
             r = self._impl.start_print_confirmed()
         if r.status_code != 200:
@@ -46,7 +61,11 @@ class SpoolManagerIntegration:
             )
         return json.loads(r.data)
 
-    def get_loaded_filament(self):
+    def get_loaded_filament(self) -> Union[str, None]:
+        """
+        Get the currently loaded filament
+        :return: the currently loaded filament
+        """
         try:
             materials = self.get_materials()
             if materials:
@@ -59,7 +78,11 @@ class SpoolManagerIntegration:
             self._logger.error(f"Error retrieving loaded filament: {e}")
             return None
 
-    def get_loaded_filaments(self):
+    def get_loaded_filaments(self) -> Union[list[str], int, None]:
+        """
+        Get the currently loaded filaments
+        :return: a list of the currently loaded filaments
+        """
         try:
             if self._impl is None:
                 self._logger.warning("Spool Manager plugin is not installed. Filament alert_type will not be checked.")

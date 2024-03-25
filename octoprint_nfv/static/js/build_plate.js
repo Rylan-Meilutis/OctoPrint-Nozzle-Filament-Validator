@@ -1,3 +1,8 @@
+/**
+ *  This file contains the JavaScript code for the build_plate plugin. It also contains the event handlers for the build
+ *  plate buttons.
+ * @param response the response from the server
+ */
 function activate_build_plate_buttons(response) {
 
     $("#build-plate-list").empty();
@@ -51,7 +56,6 @@ function activate_build_plate_buttons(response) {
                 $("#remove-build-plate-button").prop('disabled', false);
 
 
-
                 $("input[type='checkbox'][name='filament-checkbox']").prop('checked', false);
             }
         }
@@ -59,6 +63,11 @@ function activate_build_plate_buttons(response) {
 
 
 // Function to confirm before removing a build_plate
+    /**
+     * Confirm before removing a build_plate
+     * @param buildPlateID the build_plate ID
+     * @param buildPlateName the build_plate name
+     */
     function confirmRemoveBuildPlate(buildPlateID, buildPlateName) {
         if (confirm("Are you sure you want to remove build plate " + buildPlateName + "?")) {
             removeBuildPlate(buildPlateID);
@@ -66,6 +75,10 @@ function activate_build_plate_buttons(response) {
     }
 
 // Function to remove a build_plate
+    /**
+     * Remove a build_plate
+     * @param buildPlateID the build_plate ID
+     */
     function removeBuildPlate(buildPlateID) {
 
         OctoPrint.simpleApiCommand(PLUGIN_ID, "remove_build_plate", {"buildPlateId": buildPlateID})
