@@ -77,7 +77,8 @@ def ends_with_mmu(string: str) -> bool:
     """
     match_1 = re.match(r".*mmu[23](s)?$", string)
     match_2 = re.match(r".*mmu[23](s)?is$", string)
-    return bool(match_1 or match_2)
+    match_3 = re.match(r".*ismmu[23](s)?$", string)
+    return bool(match_1 or match_2 or match_3)
 
 
 def match_ends_with_mmu(string: str) -> Union[str, None]:
@@ -86,7 +87,7 @@ def match_ends_with_mmu(string: str) -> Union[str, None]:
     :param string: the string to match
     :return: the matched string
     """
-    match = re.match(r"^(.*?)(mmu[23](s)?)(is)?$", string)
+    match = re.match(r"^(.*?)(is)?(mmu[23](s)?)(is)?$", string)
     if match:
         return match.group(1)
     else:
@@ -101,17 +102,24 @@ def remove_mmu_from_end(text: str) -> str:
     """
     if bool(re.match(r".*mmu[23](s)?$|^mmu[23](s)?$", text)):
         return re.sub(r'mmu[23](s)?$', '', text)
-    else:
+    elif bool(re.match(r".*mmu[23](s)?is$|^mmu[23](s)?is$", text)):
         return re.sub(r'mmu[23](s)?is$', 'is', text)
+    elif bool(re.match(r".*ismmu[23](s)?$|^ismmu[23](s)?$", text)):
+        return re.sub(r'ismmu[23](s)?$', 'is', text)
 
 
 def remove_is_from_end(text: str) -> str:
     """
-    Remove is from the end of the string
-    :param text: the text to remove is from
-    :return: the text with is removed
+    Remove 'is' from the end of the string unless it is followed by 'mmu', a number, and optionally 's'
+    :param text: the text to remove 'is' from
+    :return: the text with 'is' removed
     """
-    return re.sub(r'is$', '', text, count=1)
+    if bool(re.search(r"ismmu[23](s)?", text)):
+        return re.sub(r'is(?=mmu[23](s)?)', '', text)
+    elif bool(re.search(r"is$", text)):
+        return re.sub(r'is$', '', text)
+    else:
+        return text
 
 
 class validator:
@@ -175,8 +183,8 @@ class validator:
 
         elif (printer_model is not None and printer_model.lower() != self.get_printer_model().lower() and printer_model
               != ""):
-            if self.get_printer_model().lower().endswith("is"):
-                if not printer_model.lower().endswith("is"):
+            if remove_mmu_from_end(self.get_printer_model().lower()).endswith("is"):
+                if not remove_mmu_from_end(printer_model.lower()).endswith("is"):
                     self.send_alert(f"Printing with non InputShaping profile on a printer that supports input shaping",
                                     alert_types.info)
 
