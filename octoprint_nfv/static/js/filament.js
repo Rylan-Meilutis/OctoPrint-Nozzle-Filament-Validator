@@ -1,3 +1,6 @@
+/**
+ * Display the filament data for the selected extruder and activate the buttons
+ */
 function setRefreshButtons() {
     // Remove any existing event handlers for the button
     $('#extruder-tabs').off('click', '[id^="refresh-filament-button"]');
