@@ -1,11 +1,20 @@
 const PLUGIN_ID = "Nozzle_Filament_Validator";
 let activeTabId = "";
 
+/**
+ * Function to sleep for a given time in ms
+ * @param time the time to sleep in ms
+ * @returns {Promise<unknown>}
+ */
 function sleep(time) {
     return new Promise(resolve => setTimeout(resolve, time));
 }
 
 // Function to fetch and display general information
+/**
+ * Function to display general information
+ * @param response The response object
+ */
 function displayGeneralInfo(response) {
     let currentBuildPlate = response.currentBuildPlate || "No build plate selected";
     let currentBuildPlateFilaments = String(response.currentBuildPlateFilaments) || "";
@@ -18,6 +27,11 @@ function displayGeneralInfo(response) {
 }
 
 // Function to create extruder tabs
+/**
+ * Function to create extruder tabs
+ * @param extrudersArray The array of extruders
+ * @param response The response object
+ */
 function createExtruderTabs(extrudersArray, response) {
     $('#extruder-tabs').empty();
     $('#myTabs').empty();
@@ -146,6 +160,11 @@ function createExtruderTabs(extrudersArray, response) {
 }
 
 // Function to fetch extruder information
+/**
+ * Fetches extruder information for the given number of extruders
+ * @param numberOfExtruders The number of extruders to fetch information for
+ * @returns {Promise<Awaited<Promise>[]>}
+ */
 function fetchExtruderInfo(numberOfExtruders) {
     let promises = [];
 
@@ -165,6 +184,9 @@ function fetchExtruderInfo(numberOfExtruders) {
 }
 
 // Main function to display data
+/**
+ * Function to update the display window with the latest data
+ */
 function displayData() {
     OctoPrint.simpleApiGet(PLUGIN_ID).done(function (response) {
         fetchExtruderInfo(response.number_of_extruders)
@@ -186,8 +208,15 @@ function displayData() {
 
 $(function () {
 // Bind the plugin message handler to the global scope
+    /**
+     * this function is called when the plugin receives a message from the server
+     */
     function messageHandler() {
-
+        /**
+         * This function is called when the plugin receives a message from the server
+         * @param plugin The plugin that sent the message
+         * @param data The data sent by the plugin
+         */
         this.onDataUpdaterPluginMessage = function (plugin, data) {
             if (plugin !== "Nozzle_Filament_Validator") {
                 return;
@@ -237,6 +266,7 @@ $(function () {
         }
     }
 
+    // Add the plugin message handler to the list of OctoPrint view models
     OCTOPRINT_VIEWMODELS.push({
         construct: messageHandler,
         additionalNames: ["messageHandler"],
@@ -244,10 +274,8 @@ $(function () {
         elements: [""]
     });
 
-    // $(document).ready(function () {
     // Initial display of data
     sleep(500).then(() => {
         displayData();
     });
-    // });
 });
