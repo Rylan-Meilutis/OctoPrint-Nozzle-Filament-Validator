@@ -526,8 +526,7 @@ class validator:
         self.update_filament_wait_status(filament_timeout.ok)
         # parse the existing spool id from the gcode
         raw_data = gcode_info["filament_notes"][index]
-        # match "sm_db_id =" with the space before the = being optional and the space after the = also being optional
-        # followed by an int.
+        
         match = re.search(r"\[sm_name\s*=\s*([^]]*\S)]", raw_data)
 
         current_fil_id = self._spool_manager.get_names()[index]
