@@ -141,7 +141,7 @@ function createExtruderTabs(extrudersArray, response) {
                     <strong>Spool Name: </strong><span>${extruderFilamentName}</span>&nbsp;&nbsp;
                     <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
                     ${check_spool_id && extruderFilamentName !== "Filament DB ID not available" ? '<p>To setup this spool in your slicer, you need to add the following line into ' +
-            'the notes setting of your filament <code>[sm_name = ' + extruderFilamentName + ']</code>(Note: you cannot have brackets [] in the name of your filament.)</p>' : ''}
+            'the notes setting of your filament <code>[sm_name = ' + extruderFilamentName + ']</code><br>(Note: you cannot have brackets [] in the name of your filament.)</p>' : ''}
                     <hr>
                     <strong>Nozzle Size: </strong><span>${extruderNozzleSize}</span>
                     <br>
