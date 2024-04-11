@@ -88,6 +88,7 @@ The plugin will look for the following settings in the notes section of the fila
 (Note: you cannot have brackets [] in the name of your filament.)
 
 Image of the settings in Prusa slicer:
+
 ![Filament notes](assets/img/plugins/Nozzle_Filament_Validator/filament_notes_config.png)
 
 ## In Development
