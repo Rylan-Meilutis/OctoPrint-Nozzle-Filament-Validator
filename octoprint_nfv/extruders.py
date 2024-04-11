@@ -19,7 +19,6 @@ class extruders:
         :param _printer_profile_manager:
         """
         super().__init__()
-        self._conn = None
         self.data_folder = data_folder
         self._logger = logger
         self._nozzle = nozzle

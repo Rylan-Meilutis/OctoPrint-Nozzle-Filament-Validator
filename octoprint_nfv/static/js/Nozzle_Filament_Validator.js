@@ -26,6 +26,17 @@ function displayGeneralInfo(response) {
     $("#number-of-extruders").text(numberOfExtruders);
 }
 
+/**
+ * Function to update the state of the filament spool check
+ * @param state The state to update to
+ */
+function updateWaitState(state) {
+    OctoPrint.simpleApiCommand(PLUGIN_ID, "updateWaitState", {"state": state}).done(function (response) {
+        displayData();
+    });
+}
+
+
 // Function to create extruder tabs
 /**
  * Function to create extruder tabs
@@ -73,7 +84,7 @@ function createExtruderTabs(extrudersArray, response) {
             <div class="form-group">
                 <button id="remove-build-plate-button" class="btn btn-danger">Remove Build Plate</button>
             </div>
-            
+ 
             <!-- Input for adding a new build plate -->
             <div class="form-group">
                 <label id="add-build-plate-title" for="build-plate-input">Add New Build Plate:</label>
@@ -92,6 +103,20 @@ function createExtruderTabs(extrudersArray, response) {
                 </div>
                 <button id="add-build-plate-button" class="btn btn-primary">Add Build Plate</button>
             </div>
+            
+            <hr>
+            <!-- Checkbox to set check_spool_id -->
+            <div class="form-group">
+                <input type="checkbox" id="check-spool-id-checkbox" ${response.check_spool_id === "True" ? 'checked' : ''}>
+                <label for="check-spool-id-checkbox">Check Spool ID</label>
+            </div>
+            <!-- Input field to set check_spool_id_timeout -->
+            <div class="form-group">
+                <label for="check-spool-id-timeout-input">Check Spool ID Timeout</label>
+                <input type="number" id="check-spool-id-timeout-input" placeholder="Enter timeout" step="1" value="${response.check_spool_id_timeout}">
+                <p>The timeout determins how long it takes with no action until the print is aborted if the spool id in 
+                the gcode doesn't match the id in Spool Manager (default 300 seconds)</p>
+            </div>
         </div>
     `);
 
@@ -99,6 +124,8 @@ function createExtruderTabs(extrudersArray, response) {
         let extruderPosition = extruder.extruderPosition || "Position Not Available";
         let extruderNozzleSize = extruder.nozzleSize || "Nozzle size not available";
         let extruderFilamentType = extruder.filamentType || "Filament type not available";
+        let extruderFilamentDBID = extruder.dbId || "Filament DB ID not available";
+        let check_spool_id = response.check_spool_id >= "True" || false;
 
         $('#myTabs').append(`
             <li class="nav-item" id="#extruder-${extruderPosition}">
@@ -110,15 +137,18 @@ function createExtruderTabs(extrudersArray, response) {
         $('#extruder-tabs').append(`
             <div class="tab-pane" id="extruder-${extruderPosition}">
                 <div>
-                    <strong>Filament Type: </strong><span>${extruderFilamentType}</span>&nbsp;&nbsp;
+                    <strong>Filament Type: </strong><span>${extruderFilamentType}</span><br>
+                    <strong>DB ID: </strong><span>${extruderFilamentDBID}</span>&nbsp;&nbsp;
                     <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
+                    ${check_spool_id && extruderFilamentDBID !== "Filament DB ID not available" ? '<p>To setup this spool in your slicer, you need to add the following line into ' +
+            'the notes setting of your filament <code>sm_db_id = ' + extruderFilamentDBID + '</code></p>' : ''}
                     <hr>
                     <strong>Nozzle Size: </strong><span>${extruderNozzleSize}</span>
                     <br>
                     <label for="nozzle-dropdown-${extruderPosition}">Select Nozzle:</label>
                     <select id="nozzle-dropdown-${extruderPosition}" class="form-control" ${nozzleDropdownDisabled}>
                     </select>
-                    <button id="select-nozzle-button-${extruderPosition}" class="btn btn-success">Select Nozzle</button>   
+                    <button id="select-nozzle-button-${extruderPosition}" class="btn btn-success">Select Nozzle</button>
                 </div>
             </div>
         `);
@@ -173,8 +203,13 @@ function fetchExtruderInfo(numberOfExtruders) {
             OctoPrint.simpleApiCommand(PLUGIN_ID, "get_extruder_info", {"extruderId": i + 1})
                 .done(function (response) {
                     resolve(response);
-                }).fail(function (xhr, status, error) {
-                reject(error);
+                }).fail(function (error) {
+                new PNotify({
+                    title: 'Extruder Error',
+                    text: 'Failed to fetch extruder information for extruder ' + (i + 1) + '.',
+                    type: 'error',
+                    hide: false
+                })
             });
         });
         promises.push(promise);
@@ -226,7 +261,98 @@ $(function () {
                 return;
             }
 
+            if (data.type === "switch_spools") {
+                let raw_data = data.msg.split(",");
+                let desiredDbID = raw_data[0].replace(" ", "");
+                let extruderPos = raw_data[1].replace(" ", "");
+                let currentDbId = raw_data[2].replace(" ", "");
+                let timeout = raw_data[3].replace(" ", "");
+
+                new PNotify({
+                    title: 'Spool Mismatch Detected',
+                    text: 'The spool specified in the gcode (id: ' + desiredDbID + '} does not match the spool ' +
+                        'loaded in Spool Manager (id: ' + currentDbId + ') which of the following is true?',
+                    icon: 'fas fa-question-circle',
+                    hide: false,
+                    closer: false,
+                    sticker: false,
+                    destroy: true,
+                    buttons: {closer: false, sticker: false},
+                    confirm: {
+                        confirm: true,
+                        buttons: [{
+                            text: 'The correct spool is loaded',
+                            primary: true,
+                            addClass: "button",
+                            click: notice => {
+                                updateSpool(desiredDbID, extruderPos);
+                                updateWaitState("ok");
+                                notice.update({
+                                    title: 'Correct spool loaded',
+                                    text: 'Changing the spool and continuing',
+                                    icon: true,
+                                    closer: true,
+                                    sticker: false,
+                                    type: 'info',
+                                    buttons: {closer: true, sticker: false},
+                                    hide: true,
+                                });
+                                notice.get().find(".button").remove();
+
+                            }
+                        },
+                            {
+                                text: 'The incorrect spool is loaded',
+                                addClass: "button",
+                                click: notice => {
+                                    updateWaitState("cancel");
+                                    notice.update({
+                                        title: 'Incorrect spool loaded',
+                                        text: 'leaving the spool and canceling the print',
+                                        icon: true,
+                                        closer: true,
+                                        sticker: false,
+                                        type: 'info',
+                                        buttons: {closer: true, sticker: false},
+                                        hide: true,
+
+
+                                    });
+                                    notice.get().find(".button").remove();
+                                },
+                            },
+                            {
+                                text: 'The incorrect spool is loaded but I want to continue anyway.',
+                                addClass: "button",
+                                click: notice => {
+                                    updateWaitState("ok");
+                                    notice.update({
+                                        title: 'Ignoring spool',
+                                        text: 'Ignoring the spool and continuing the print',
+                                        icon: true,
+                                        closer: true,
+                                        sticker: false,
+                                        type: 'info',
+                                        buttons: {closer: true, sticker: false},
+                                        hide: true,
+                                    });
+                                    notice.get().find(".button").remove();
+
+                                }
+                            }
+                        ]
+                    }, before_close: function (notice) {
+                        updateWaitState("cancel")
+                    },
+                    // Close the notification after 5000 milliseconds (5 seconds)
+                    autoClose: $(timeout) ? timeout * 1000 : 5000
+
+                });
+                return;
+            }
+
             let theme;
+
             switch (data.type) {
                 case "popup":
                     theme = "info";
@@ -265,6 +391,7 @@ $(function () {
             }
         }
     }
+
 
     // Add the plugin message handler to the list of OctoPrint view models
     OCTOPRINT_VIEWMODELS.push({

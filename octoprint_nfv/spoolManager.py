@@ -12,6 +12,11 @@ class SpoolManagerException(Exception):
 
 class SpoolManagerIntegration:
     def __init__(self, impl: Any, logger: logging.Logger) -> None:
+        """
+        Constructor
+        :param impl: implementation of the Spool Manager
+        :param logger: logger object
+        """
         self._logger = logger
         self._impl = impl
 
@@ -106,3 +111,28 @@ class SpoolManagerIntegration:
         except Exception as e:
             self._logger.error(f"Error retrieving loaded filament: {e}")
             return -2
+
+    def get_db_ids(self) -> Union[list[str], None]:
+        """
+        Get the database id's of the spools
+        :return: the serial number of the spool
+        """
+        """
+        Get the materials from the Spool Manager
+        :return:
+        """
+        try:
+            serial_numbers = self._impl.api_getSelectedSpoolInformations()
+            self._logger.info(f"SM_data: {serial_numbers}")
+            serial_numbers = [
+                f"{m['databaseId']}"
+                if m is not None
+                else None
+                for m in serial_numbers
+            ]
+            return serial_numbers
+        except Exception as e:
+            self._logger.warning(
+                f"Skipping material assignment due to SpoolManager error: {e}"
+            )
+            return []
