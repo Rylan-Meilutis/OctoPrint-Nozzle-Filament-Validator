@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import re
 from typing import Any
 
 
@@ -79,6 +80,17 @@ def replace_db_ids(gcode: str, json_data: list[Any]) -> str:
     if json_data is None:
         return gcode
     # match the regex
+    filament_notes_pattern = re.compile(r'; filament_notes = (.+)')
+    filament_notes_match = filament_notes_pattern.search(gcode)
+    filament_notes = None
+    if filament_notes_match:
+        filament_notes = filament_notes_match.group(1).strip().split(';')
+    if filament_notes is None:
+        return gcode
+
+    # Filament_notes is a list of strings containing the notes of the filament, you need to search for "sm_db_id = "
+    # with optional spaces around the equal sign and then optionally a number.
+    # You will be replacing the number if it is there.
 
     # loop through the json data
     for i in range(len(json_data)):
