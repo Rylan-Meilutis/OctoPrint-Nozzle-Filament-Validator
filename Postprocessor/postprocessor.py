@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
-import sys
-import os
 import json
+import os
 import re
+import sys
 from typing import Any
 
 
@@ -100,7 +100,7 @@ def replace_names(gcode: str, json_data: list[Any]) -> str:
         if json_data[i] is None:
             continue
         # regex pattern used to match in the validation function: r"\[sm_name\s*=\s*([^]]*\S)]"
-        
+
         # replace the match with the json data
         pass
 

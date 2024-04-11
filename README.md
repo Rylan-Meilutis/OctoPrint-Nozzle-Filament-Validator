@@ -6,6 +6,15 @@ It uses the slicer config present in the gcode to work, it is not a replacement 
 prevent simple
 mistakes from occurring
 
+Settings page with multiple extruders:
+![settings page](assets/img/plugins/Nozzle_Filament_Validator/settings_page_5_extruders.png)
+
+Settings page for extruder 1:
+![settings page_extruder1](assets/img/plugins/Nozzle_Filament_Validator/settings_page_extruder1.png)
+
+Settings page for 1 extruder:
+![settings page_1_extruder](assets/img/plugins/Nozzle_Filament_Validator/settings_page_1_extruder.png)
+
 ## Setup
 
 Install via the bundled [Plugin Manager](https://docs.octoprint.org/en/master/bundledplugins/pluginmanager.html)
@@ -74,9 +83,12 @@ This is the time in seconds that the plugin will wait before failing the print.
 ### Slicer config
 
 Using this requires the slicer to be set up correctly.
-The plugin will look for the following settings in the filament notes section of the gcode
-<code>[sm_db_id = (filament ID)]</code> (the brackets are essential for the plugin to find the setting)
+The plugin will look for the following settings in the notes section of the filament profile in the gcode
+<code>[sm_name = (filament name)]</code> (the brackets are essential for the plugin to find the setting)
 (Note: you cannot have brackets [] in the name of your filament.)
+
+Image of the settings in Prusa slicer:
+![Filament notes](assets/img/plugins/Nozzle_Filament_Validator/filament_notes_config.png)
 
 ## In Development
 
