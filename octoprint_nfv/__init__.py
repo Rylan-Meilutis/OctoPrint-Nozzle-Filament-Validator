@@ -215,7 +215,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                         filaments = None
                     return flask.jsonify(nozzleSize=nozzle_size, extruderPosition=extruder_position,
                                          filamentType=filaments,
-                                         dbId=self._spool_manager.get_db_ids()[extruder_position - 1])
+                                         spoolName=self._spool_manager.get_names()[extruder_position - 1])
                 except Exception as e:
                     self.send_alert(f"Error retrieving extruder info: {e}", alert_types.tmp_error)
                     return flask.abort(500)
@@ -223,7 +223,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         elif command == "get_loaded_filaments":
             try:
                 filaments = str(self._spool_manager.get_loaded_filaments()).replace("[", "").replace("]", "")
-                self._spool_manager.get_db_ids()
+                self._spool_manager.get_names()
                 return flask.jsonify(filaments=filaments)
             except Exception as e:
                 self.send_alert(f"Error retrieving filament info: {e}", alert_types.tmp_error)

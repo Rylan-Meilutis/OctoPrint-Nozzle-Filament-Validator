@@ -156,6 +156,15 @@ class validator:
         self._printer_profile_manager = printer_profile_manager
         self._filament = filament
         self.filament_wait_status = "ok"
+        self.paused = False
+
+    def pause_print(self) -> None:
+        """
+        Pause the print
+        """
+        if not self.paused:
+            self._printer.pause_print()
+            self.paused = True
 
     def update_filament_wait_status(self, state: str) -> None:
         """
@@ -189,31 +198,23 @@ class validator:
         if not os.path.exists(file_path):
             self.send_alert(f"File {file_path} not found, no checks will be performed. Press RESUME to continue "
                             f"anyways", alert_types.error)
-            self._printer.pause_print()
+            self.pause_print()
             return
 
         nozzle_passed = True
         filament_passed = True
+        spool_passed = True
         gcode_info = parse_gcode(file_path)
         printer_model = gcode_info["printer_model"]
         skip_validation = gcode_info["skip_validation"]
 
         if skip_validation:
             return
-        self._logger.info("Checking print...")
 
         if not self.check_printer_model(printer_model):
             return
-        self._logger.info("passed printer model check...")
 
-        # Retrieve the loaded filament alert_type from spool manager
-        try:
-            loaded_filaments = self._spool_manager.get_loaded_filaments()
-        except Exception as e:
-            self.send_alert(f"Error retrieving loaded filament: {e}", alert_types.error)
-            return
         # Parse the GCODE file to extract the nozzle size and filament alert_type
-
         nozzles = gcode_info["nozzle_size"]
         filament_types = gcode_info["filament_type"]
         filament_used = gcode_info["filament_used"]
@@ -221,6 +222,23 @@ class validator:
         mmu_pass, mmu_single_mode = self.check_mmu(printer_model, nozzles, filament_types, filament_used)
 
         if not mmu_pass:
+            return
+
+        for i in range(len(nozzles)):
+            if filament_used[i] is not None:
+                # if no filament was used, assume the tool isn't used and skip the check
+                if float(filament_used[i]) == 0:
+                    continue
+
+            spool_pass, spool_passed = self.check_spool_id(i, gcode_info, spool_passed)
+            if not spool_pass:
+                return
+
+        # Retrieve the loaded filament alert_type from spool manager
+        try:
+            loaded_filaments = self._spool_manager.get_loaded_filaments()
+        except Exception as e:
+            self.send_alert(f"Error retrieving loaded filament: {e}", alert_types.error)
             return
 
         if not self.check_num_filaments(loaded_filaments, filament_types, mmu_single_mode):
@@ -237,9 +255,6 @@ class validator:
                     if float(filament_used[i]) == 0:
                         continue
 
-                if not self.check_spool_id(i, gcode_info):
-                    return
-
                 filament_passed, filament_pass = self.check_filament_type(i, loaded_filaments, filament_types,
                                                                           gcode_info, filament_passed, mmu_single_mode)
                 if not filament_pass:
@@ -253,7 +268,7 @@ class validator:
                     return
 
             # Check if the print passed all checks
-            if nozzle_passed and filament_passed:
+            if nozzle_passed and filament_passed and spool_passed:
                 self.send_alert("Print passed nozzle and filament check", alert_types.success)
                 self._logger.info("Print passed nozzle and filament check...")
 
@@ -269,14 +284,14 @@ class validator:
                 out_str = out_str[:-2]
                 self.send_alert(f"Not all checks passed, the following checks failed: {out_str}.\nPlease check your "
                                 f"config and press resume to continue.", alert_types.info)
-                self._printer.pause_print()
+                self.pause_print()
 
         # If an error occurred while running checks, pause the print
         except Exception as e:
             self.send_alert(f"An error occurred while running checks, please report this error on github. \n"
                             f"Error: \"{e}\" \n please check your config and press resume to continue.",
                             alert_types.error)
-            self._printer.pause_print()
+            self.pause_print()
             return
 
     def check_printer_model(self, printer_model: str = None) -> bool:
@@ -335,7 +350,7 @@ class validator:
             self.send_alert(
                 f"Print paused: Number of nozzles in gcode ({len(nozzles)}) is shorter than the number of extruders("
                 f"{self.extruders.get_number_of_extruders()}). Press RESUME to continue", alert_types.info)
-            self._printer.pause_print()
+            self.pause_print()
 
         return True, mmu_single_mode
 
@@ -349,9 +364,13 @@ class validator:
         :return: true if the check passed
         """
         # Check if the number of filament types in the GCODE is longer than the number of extruders on the printer
-        if len(filament_types) > len(loaded_filaments):
+        fil_length = 0
+        for i in loaded_filaments:
+            if i is not None:
+                fil_length += 1
+        if len(filament_types) > fil_length:
             self.send_alert(
-                f"Loaded filaments ({len(loaded_filaments)}) is shorter than the number specified in the gcode "
+                f"Loaded filaments ({fil_length}) is shorter than the number specified in the gcode "
                 f"({len(filament_types)})", alert_types.error)
             self._printer.cancel_print()
             return False
@@ -362,7 +381,7 @@ class validator:
             self.send_alert(
                 f" Print paused: loaded filaments ({len(loaded_filaments)}) is longer than the number specified in "
                 f"the gcode ({len(filament_types)}). Press RESUME to continue", alert_types.info)
-            self._printer.pause_print()
+            self.pause_print()
 
         return True
 
@@ -382,7 +401,7 @@ class validator:
             self.send_alert(
                 f"Number of extruders in gcode ({len(nozzles)}) is shorter than the number specified in the "
                 f"config ({self.extruders.get_number_of_extruders()}). Press RESUME to continue", alert_types.error)
-            self._printer.pause_print()
+            self.pause_print()
             return False
 
         return True
@@ -491,15 +510,17 @@ class validator:
                 return False
         return True
 
-    def check_spool_id(self, index: int, gcode_info: dict[str, Any]) -> bool:
+    def check_spool_id(self, index: int, gcode_info: dict[str, Any], passed: bool) -> tuple[bool, bool]:
         """
         Check the spool id, if it is invalid, wait for input from the frontend
         :param index: index of the extruder
         :param gcode_info: info from the GCODE
+        :passed: the current state of passed
         :return: true if the check passed
         """
+
         if not self._filament.get_enable_spool_checking():
-            return True
+            return True, True
 
         timeout = self._filament.get_timeout()
         self.update_filament_wait_status(filament_timeout.ok)
@@ -507,14 +528,19 @@ class validator:
         raw_data = gcode_info["filament_notes"][index]
         # match "sm_db_id =" with the space before the = being optional and the space after the = also being optional
         # followed by an int.
-        match = re.search(r"sm_db_id\s*=\s*(\d+)", raw_data)
+        match = re.search(r"\[sm_name\s*=\s*([^]]*\S)]", raw_data)
 
-        current_fil_id = self._spool_manager.get_db_ids()[index]
+        current_fil_id = self._spool_manager.get_names()[index]
 
         if match:
-            spool_id = int(match.group(1))
-            if int(current_fil_id) != spool_id:
-                self.send_alert(f"{int(match.group(1))}, {index}, {current_fil_id}, {self._filament.get_timeout()}",
+            spool_id = str(match.group(1))
+            if current_fil_id is None:
+                self.send_alert(f"{spool_id}, {index}, None Selected, {self._filament.get_timeout()}",
+                                alert_types.switch_spools)
+                self.update_filament_wait_status(filament_timeout.waiting)
+
+            elif str(current_fil_id) != spool_id:
+                self.send_alert(f"{spool_id}, {index}, {current_fil_id}, {self._filament.get_timeout()}",
                                 alert_types.switch_spools)
                 self.update_filament_wait_status(filament_timeout.waiting)
 
@@ -522,15 +548,17 @@ class validator:
                 if timeout == 0:
                     self.send_alert("Timeout reached, print cancelling", alert_types.error)
                     self._printer.cancel_print()
-                    return False
+                    return False, False
                 timeout -= 1
                 time.sleep(1)
         else:
-            self.send_alert(f"Spool ID not found in GCODE for extruder {index + 1}. Press RESUME to continue.",
+            self.send_alert(f"Spool name not found in GCODE for extruder {index + 1}. Press RESUME to continue.",
                             alert_types.error)
-            self._printer.pause_print()
+            self.pause_print()
+            passed = False
         if self.filament_wait_status == filament_timeout.cancel:
+            self.send_alert("Cancelling print", alert_types.error)
             self._printer.cancel_print()
-            return False
+            return False, False
 
-        return True
+        return True, passed

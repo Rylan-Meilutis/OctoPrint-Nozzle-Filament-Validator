@@ -1,11 +1,11 @@
 {
   "1": {
-    "db_id": 0
+    "sm_name": "Blue PLA"
   },
   "2": {
-    "db_id": 1
+    "sm_name": "grey pla (spool 2)"
   },
   "3": {
-    "db_id": 4
+    "sm_name": "Purpelish PETG (spool3)"
   }
 }

@@ -124,7 +124,7 @@ function createExtruderTabs(extrudersArray, response) {
         let extruderPosition = extruder.extruderPosition || "Position Not Available";
         let extruderNozzleSize = extruder.nozzleSize || "Nozzle size not available";
         let extruderFilamentType = extruder.filamentType || "Filament type not available";
-        let extruderFilamentDBID = extruder.dbId || "Filament DB ID not available";
+        let extruderFilamentName = extruder.spoolName || "Filament DB ID not available";
         let check_spool_id = response.check_spool_id >= "True" || false;
 
         $('#myTabs').append(`
@@ -138,10 +138,10 @@ function createExtruderTabs(extrudersArray, response) {
             <div class="tab-pane" id="extruder-${extruderPosition}">
                 <div>
                     <strong>Filament Type: </strong><span>${extruderFilamentType}</span><br>
-                    <strong>DB ID: </strong><span>${extruderFilamentDBID}</span>&nbsp;&nbsp;
+                    <strong>Spool Name: </strong><span>${extruderFilamentName}</span>&nbsp;&nbsp;
                     <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
-                    ${check_spool_id && extruderFilamentDBID !== "Filament DB ID not available" ? '<p>To setup this spool in your slicer, you need to add the following line into ' +
-            'the notes setting of your filament <code>sm_db_id = ' + extruderFilamentDBID + '</code></p>' : ''}
+                    ${check_spool_id && extruderFilamentName !== "Filament DB ID not available" ? '<p>To setup this spool in your slicer, you need to add the following line into ' +
+            'the notes setting of your filament <code>[sm_name = ' + extruderFilamentName + ']</code>(Note: you cannot have brackets [] in the name of your filament.)</p>' : ''}
                     <hr>
                     <strong>Nozzle Size: </strong><span>${extruderNozzleSize}</span>
                     <br>
@@ -262,73 +262,120 @@ $(function () {
             }
 
             if (data.type === "switch_spools") {
-                let raw_data = data.msg.split(",");
-                let desiredDbID = raw_data[0].replace(" ", "");
-                let extruderPos = raw_data[1].replace(" ", "");
-                let currentDbId = raw_data[2].replace(" ", "");
-                let timeout = raw_data[3].replace(" ", "");
+                get_spools().then((raw_spool_data) => {
+                    let raw_data = data.msg.split(",");
+                    let desiredName = raw_data[0];
 
-                new PNotify({
-                    title: 'Spool Mismatch Detected',
-                    text: 'The spool specified in the gcode (id: ' + desiredDbID + '} does not match the spool ' +
-                        'loaded in Spool Manager (id: ' + currentDbId + ') which of the following is true?',
-                    icon: 'fas fa-question-circle',
-                    hide: false,
-                    closer: false,
-                    sticker: false,
-                    destroy: true,
-                    buttons: {closer: false, sticker: false},
-                    confirm: {
-                        confirm: true,
-                        buttons: [{
-                            text: 'The correct spool is loaded',
-                            primary: true,
-                            addClass: "button",
-                            click: notice => {
-                                updateSpool(desiredDbID, extruderPos);
-                                updateWaitState("ok");
-                                notice.update({
-                                    title: 'Correct spool loaded',
-                                    text: 'Changing the spool and continuing',
-                                    icon: true,
-                                    closer: true,
-                                    sticker: false,
-                                    type: 'info',
-                                    buttons: {closer: true, sticker: false},
-                                    hide: true,
-                                });
-                                notice.get().find(".button").remove();
+                    // remove leading and trailing whitespace
+                    while (desiredName[0] === " ") {
+                        desiredName = desiredName.substring(1);
+                    }
+                    while (desiredName[desiredName.length - 1] === " ") {
+                        desiredName = desiredName.substring(0, desiredName.length - 1);
+                    }
 
-                            }
-                        },
-                            {
-                                text: 'The incorrect spool is loaded',
-                                addClass: "button",
-                                click: notice => {
-                                    updateWaitState("cancel");
-                                    notice.update({
-                                        title: 'Incorrect spool loaded',
-                                        text: 'leaving the spool and canceling the print',
-                                        icon: true,
-                                        closer: true,
-                                        sticker: false,
-                                        type: 'info',
-                                        buttons: {closer: true, sticker: false},
-                                        hide: true,
+                    let extruderPos = raw_data[1].replace(" ", "");
+                    let currentName = raw_data[2].replace(" ", "");
+                    let timeout = raw_data[3].replace(" ", "");
+
+                    if (raw_spool_data === undefined || raw_spool_data.length === 0) {
+                        alert("No spools found in Spool Manager. Please add a spool to Spool Manager before continuing.");
+                        updateWaitState("cancel")
+                        return;
+                    }
+
+                    let spool = raw_spool_data.find(sp => sp.displayName === desiredName);
+                    let desiredDbId = undefined;
+
+                    if (spool) {
+                       desiredDbId = spool.databaseId;
+                    }
+
+                    if (desiredDbId === undefined) {
+                        new PNotify({
+                            title: 'Spool Mismatch Detected',
+                            text: 'The spool specified in the gcode (name: ' + desiredName + ') does not match the spool ' +
+                                'loaded in Spool Manager (name: ' + currentName + '). The desired spool was not found. Which of the following is true?',
+                            icon: 'fas fa-question-circle',
+                            hide: false,
+                            closer: false,
+                            sticker: false,
+                            destroy: true,
+                            buttons: {closer: false, sticker: false},
+                            confirm: {
+                                confirm: true,
+                                buttons: [{
+                                    text: 'The incorrect spool is loaded',
+                                    addClass: "button",
+                                    click: notice => {
+                                        updateWaitState("cancel");
+                                        notice.update({
+                                            title: 'Incorrect spool loaded',
+                                            text: 'leaving the spool and canceling the print',
+                                            icon: true,
+                                            closer: true,
+                                            sticker: false,
+                                            type: 'info',
+                                            buttons: {closer: true, sticker: false},
+                                            hide: true,
 
 
-                                    });
-                                    notice.get().find(".button").remove();
+                                        });
+                                        notice.get().find(".button").remove();
+                                    },
                                 },
+                                    {
+                                        text: 'The incorrect spool is loaded but I want to continue anyway.',
+                                        addClass: "button",
+                                        click: notice => {
+                                            updateWaitState("ok");
+                                            notice.update({
+                                                title: 'Ignoring spool',
+                                                text: 'Ignoring the spool and continuing the print',
+                                                icon: true,
+                                                closer: true,
+                                                sticker: false,
+                                                type: 'info',
+                                                buttons: {closer: true, sticker: false},
+                                                hide: true,
+                                            });
+                                            notice.get().find(".button").remove();
+
+                                        }
+                                    }
+                                ]
+                            }, before_close: function (notice) {
+                                updateWaitState("cancel")
                             },
-                            {
-                                text: 'The incorrect spool is loaded but I want to continue anyway.',
+                            // Close the notification after 5000 milliseconds (5 seconds)
+                            autoClose: $(timeout) ? timeout * 1000 : 5000
+
+                        });
+                        return;
+                    }
+
+                    new PNotify({
+                        title: 'Spool Mismatch Detected',
+                        text: 'The spool specified in the gcode (name: ' + desiredName + ') does not match the spool ' +
+                            'loaded in Spool Manager (name: ' + currentName + '). Which of the following is true?',
+                        icon: 'fas fa-question-circle',
+                        hide: false,
+                        closer: false,
+                        sticker: false,
+                        destroy: true,
+                        buttons: {closer: false, sticker: false},
+                        confirm: {
+                            confirm: true,
+                            buttons: [{
+                                text: 'The correct spool is loaded',
+                                primary: true,
                                 addClass: "button",
                                 click: notice => {
+                                    updateSpool(desiredDbId, extruderPos);
                                     updateWaitState("ok");
                                     notice.update({
-                                        title: 'Ignoring spool',
-                                        text: 'Ignoring the spool and continuing the print',
+                                        title: 'Correct spool loaded',
+                                        text: 'Changing the spool and continuing',
                                         icon: true,
                                         closer: true,
                                         sticker: false,
@@ -339,18 +386,60 @@ $(function () {
                                     notice.get().find(".button").remove();
 
                                 }
-                            }
-                        ]
-                    }, before_close: function (notice) {
-                        updateWaitState("cancel")
-                    },
-                    // Close the notification after 5000 milliseconds (5 seconds)
-                    autoClose: $(timeout) ? timeout * 1000 : 5000
+                            },
+                                {
+                                    text: 'The incorrect spool is loaded',
+                                    addClass: "button",
+                                    click: notice => {
+                                        updateWaitState("cancel");
+                                        notice.update({
+                                            title: 'Incorrect spool loaded',
+                                            text: 'leaving the spool and canceling the print',
+                                            icon: true,
+                                            closer: true,
+                                            sticker: false,
+                                            type: 'info',
+                                            buttons: {closer: true, sticker: false},
+                                            hide: true,
+
+
+                                        });
+                                        notice.get().find(".button").remove();
+                                    },
+                                },
+                                {
+                                    text: 'The incorrect spool is loaded but I want to continue anyway.',
+                                    addClass: "button",
+                                    click: notice => {
+                                        updateWaitState("ok");
+                                        notice.update({
+                                            title: 'Ignoring spool',
+                                            text: 'Ignoring the spool and continuing the print',
+                                            icon: true,
+                                            closer: true,
+                                            sticker: false,
+                                            type: 'info',
+                                            buttons: {closer: true, sticker: false},
+                                            hide: true,
+                                        });
+                                        notice.get().find(".button").remove();
+
+                                    }
+                                }
+                            ]
+                        }, before_close: function (notice) {
+                            updateWaitState("cancel")
+                        },
+                        // Close the notification after 5000 milliseconds (5 seconds)
+                        autoClose: $(timeout) ? timeout * 1000 : 5000
+
+                    });
+
+                }).catch((error) => {
 
                 });
                 return;
             }
-
             let theme;
 
             switch (data.type) {

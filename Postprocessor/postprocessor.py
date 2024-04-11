@@ -13,7 +13,7 @@ def main() -> None:
     json_path = sys.argv[1]
     json_data = parse_json_file(json_path)
     gcode = parse_gcode(gcode_path)
-    new_file = replace_db_ids(gcode, json_data)
+    new_file = replace_names(gcode, json_data)
     with open(gcode_path, 'w') as file:
         file.write(new_file)
 
@@ -29,7 +29,7 @@ def parse_json_file(json_path: str) -> list[Any]:
         # get each db id and the corresponding extruder position and put then in order in a list
         out_list = [None] * len(data)
         for key, value in data.items():
-            out_list[int(key)] = value['db_id']
+            out_list[int(key)] = value['sm_name']
         return out_list
 
 
@@ -65,7 +65,7 @@ def parse_gcode(gcode_path: str) -> str:
         return ''.join(lines)
 
 
-def replace_db_ids(gcode: str, json_data: list[Any]) -> str:
+def replace_names(gcode: str, json_data: list[Any]) -> str:
     """
     Replace the db ids in the gcode with the correct values
     :param gcode: the last 1000 lines of the gcode
@@ -75,8 +75,9 @@ def replace_db_ids(gcode: str, json_data: list[Any]) -> str:
     # Replace the db ids in the gcode with the correct values
     # it should match the gcode using a regex patter and replace the values with those in the json file provided.
     # the json data is as follows, it is a list where the index is the extruder position and the value is the db id
-    # [1, 2, 3, 4] if there is no db id for a given extruder position, the value will be None
-    # [1, 2, None, 4] in this case, the db id for extruder position 3 is not assigned.
+    # ["blue PLA+", "blue petg", "purple abs", "grey pla"] if there is no db id for a given extruder position,
+    # the value will be None
+    # ["blue PLA+", "blue petg", None, "grey pla"] in this case, the db id for extruder position 3 is not assigned.
     if json_data is None:
         return gcode
     # match the regex
@@ -88,7 +89,7 @@ def replace_db_ids(gcode: str, json_data: list[Any]) -> str:
     if filament_notes is None:
         return gcode
 
-    # Filament_notes is a list of strings containing the notes of the filament, you need to search for "sm_db_id = "
+    # Filament_notes is a list of strings containing the notes of the filament, you need to search for "sm_name = "
     # with optional spaces around the equal sign and then optionally a number.
     # You will be replacing the number if it is there.
 

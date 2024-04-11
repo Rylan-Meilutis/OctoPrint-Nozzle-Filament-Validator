@@ -71,3 +71,29 @@ function updateSpool(dbID, extruderPos) {
     });
 }
 
+
+function get_spools() {
+    return new Promise((resolve, reject) => {
+        $.ajax({
+            url: self.location.href.substring(0, self.location.href.lastIndexOf('/')) + "/plugin/SpoolManager/loadSpoolsByQuery?selectedPageSize=10&from=0&to=10&sortColumn=displayName&sortOrder=desc&filterName=&materialFilter=all&vendorFilter=all&colorFilter=all",
+            dataType: "json",
+            contentType: "application/json; charset=UTF-8",
+            type: "GET"
+        }).done(function (data) {
+            resolve(data["allSpools"]);
+        }).fail(function (data) {
+            new PNotify({
+                title: 'SpoolManager Error',
+                text: 'Failed to get spools:' + data.responseText,
+                type: 'error',
+                hide: false,
+                closer: true,
+                sticker: false,
+                buttons: {closer: true, sticker: false}
+            });
+            updateWaitState("cancel");
+            reject(data);
+        });
+    });
+}
+

@@ -112,25 +112,48 @@ class SpoolManagerIntegration:
             self._logger.error(f"Error retrieving loaded filament: {e}")
             return -2
 
-    def get_db_ids(self) -> Union[list[str], None]:
+    def get_names(self) -> Union[list[str], None]:
         """
-        Get the database id's of the spools
-        :return: the serial number of the spool
+        Get the name of the spools
+        :return: the name of the spool
         """
         """
         Get the materials from the Spool Manager
         :return:
         """
         try:
-            serial_numbers = self._impl.api_getSelectedSpoolInformations()
-            self._logger.info(f"SM_data: {serial_numbers}")
-            serial_numbers = [
+            spool_names = self._impl.api_getSelectedSpoolInformations()
+            spool_names = [
+                f"{m['spoolName']}"
+                if m is not None
+                else None
+                for m in spool_names
+            ]
+            return spool_names
+        except Exception as e:
+            self._logger.warning(
+                f"Skipping material assignment due to SpoolManager error: {e}"
+            )
+            return []
+
+    def get_db_id(self) -> Union[list[str], None]:
+        """
+        Get the database id's of the spools
+        :return: the db_id's of the spool
+        """
+        """
+        Get the materials from the Spool Manager
+        :return:
+        """
+        try:
+            db_ids = self._impl.api_getSelectedSpoolInformations()
+            db_ids = [
                 f"{m['databaseId']}"
                 if m is not None
                 else None
-                for m in serial_numbers
+                for m in db_ids
             ]
-            return serial_numbers
+            return db_ids
         except Exception as e:
             self._logger.warning(
                 f"Skipping material assignment due to SpoolManager error: {e}"
