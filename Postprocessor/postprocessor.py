@@ -11,12 +11,17 @@ def main() -> None:
     """
     Main function
     """
-    gcode_path = sys.argv[2]
-    json_path = sys.argv[1]
+    gcode_path = str(sys.argv[2])
+    json_path = str(sys.argv[1])
     json_data = parse_json_file(json_path)
     gcode = parse_gcode(gcode_path)
     new_file = replace_names(gcode, json_data)
+    # replace the last 1000 lines of the gcode with the new data
+    with open(gcode_path, 'r') as file:
+        data = file.readlines()
     with open(gcode_path, 'w') as file:
+        for line in data[:-1000]:
+            file.write(line)
         file.write(new_file)
 
 
@@ -31,7 +36,7 @@ def parse_json_file(json_path: str) -> list[Any]:
         # get each db id and the corresponding extruder position and put then in order in a list
         out_list = [None] * len(data)
         for key, value in data.items():
-            out_list[int(key)] = value['sm_name']
+            out_list[int(key) -1 ] = value['sm_name']
         return out_list
 
 
@@ -86,16 +91,21 @@ def replace_names(gcode: str, json_data: list[Any]) -> str:
     if filament_notes is None:
         return gcode
 
-    new_filament_notes = filament_notes_match.group(0) + filament_notes_match.group(1)
+    new_filament_notes = filament_notes_match.group(0)
     # loop through the json data
     for i in range(len(filament_notes)):
-        if json_data[i] is None:
+        try:
+            if json_data[i] is None:
+                continue
+        except IndexError:
             continue
         if re.search(r"\[\s*sm_name\s*=\s*([^]]*\S)]", filament_notes[i]):
             tmp_string = re.sub(r"\[\s*sm_name\s*=\s*([^]]*\S)]", f"[sm_name = {json_data[i]}]", filament_notes[i])
             # replace the match with the json data
             new_filament_notes = new_filament_notes.replace(filament_notes[i], tmp_string)
 
+    # replace the filament notes in the gcode
+    gcode = gcode.replace(filament_notes_match.group(0), new_filament_notes)
     return gcode
 
 
