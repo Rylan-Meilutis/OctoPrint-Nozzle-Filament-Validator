@@ -31,6 +31,9 @@ def parse_json_file(json_path: str) -> list[Any]:
     :param json_path: path to the json file
     :return: a list of db ids in order
     """
+    # add the current directory of the py file to the front of the json path if it is not an absolute path
+    if not os.path.isabs(json_path):
+        json_path = os.path.join(os.path.dirname(__file__), json_path)
     with open(json_path, 'r') as file:
         data = json.load(file)
         # get each db id and the corresponding extruder position and put then in order in a list
