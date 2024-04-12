@@ -74,12 +74,7 @@ def replace_names(gcode: str, json_data: list[Any]) -> str:
     :param json_data: the list of db ids in order
     :return: the last 1000 lines of the gcode with the db ids replaced
     """
-    # Replace the db ids in the gcode with the correct values
-    # it should match the gcode using a regex patter and replace the values with those in the json file provided.
-    # the json data is as follows, it is a list where the index is the extruder position and the value is the db id
-    # ["blue PLA+", "blue petg", "purple abs", "grey pla"] if there is no db id for a given extruder position,
-    # the value will be None
-    # ["blue PLA+", "blue petg", None, "grey pla"] in this case, the db id for extruder position 3 is not assigned.
+
     if json_data is None:
         return gcode
     # match the regex
@@ -91,18 +86,15 @@ def replace_names(gcode: str, json_data: list[Any]) -> str:
     if filament_notes is None:
         return gcode
 
-    # Filament_notes is a list of strings containing the notes of the filament, you need to search for "sm_name = "
-    # with optional spaces around the equal sign and then optionally a number.
-    # You will be replacing the number if it is there.
-
+    new_filament_notes = filament_notes_match.group(0) + filament_notes_match.group(1)
     # loop through the json data
-    for i in range(len(json_data)):
+    for i in range(len(filament_notes)):
         if json_data[i] is None:
             continue
-        # regex pattern used to match in the validation function: r"\[\s*sm_name\s*=\s*([^]]*\S)]"
-
-        # replace the match with the json data
-        pass
+        if re.search(r"\[\s*sm_name\s*=\s*([^]]*\S)]", filament_notes[i]):
+            tmp_string = re.sub(r"\[\s*sm_name\s*=\s*([^]]*\S)]", f"[sm_name = {json_data[i]}]", filament_notes[i])
+            # replace the match with the json data
+            new_filament_notes = new_filament_notes.replace(filament_notes[i], tmp_string)
 
     return gcode
 
