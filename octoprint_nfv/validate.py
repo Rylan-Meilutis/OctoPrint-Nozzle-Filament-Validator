@@ -527,7 +527,7 @@ class validator:
         # parse the existing spool id from the gcode
         raw_data = gcode_info["filament_notes"][index]
 
-        match = re.search(r"\[sm_name\s*=\s*([^]]*\S)]", raw_data)
+        match = re.search(r"\[\s*sm_name\s*=\s*([^]]*\S)]", raw_data)
 
         current_fil_id = self._spool_manager.get_names()[index]
 

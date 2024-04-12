@@ -99,7 +99,7 @@ def replace_names(gcode: str, json_data: list[Any]) -> str:
     for i in range(len(json_data)):
         if json_data[i] is None:
             continue
-        # regex pattern used to match in the validation function: r"\[sm_name\s*=\s*([^]]*\S)]"
+        # regex pattern used to match in the validation function: r"\[\s*sm_name\s*=\s*([^]]*\S)]"
 
         # replace the match with the json data
         pass
