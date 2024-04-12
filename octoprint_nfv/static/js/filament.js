@@ -65,7 +65,6 @@ function updateSpool(dbID, extruderPos) {
             closer: true,
             sticker: false,
             buttons: {closer: true, sticker: false}
-
         })
         updateWaitState("cancel");
     });

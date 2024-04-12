@@ -36,7 +36,6 @@ function updateWaitState(state) {
     });
 }
 
-
 // Function to create extruder tabs
 /**
  * Function to create extruder tabs
@@ -183,10 +182,7 @@ function createExtruderTabs(extrudersArray, response) {
         if (data !== "" && $(`#${data}`).parent().attr('id') === "extruder-tabs") {
             activeTabId = data;
         }
-
     });
-
-
 }
 
 // Function to fetch extruder information
@@ -214,7 +210,6 @@ function fetchExtruderInfo(numberOfExtruders) {
         });
         promises.push(promise);
     }
-
     return Promise.all(promises);
 }
 
@@ -288,7 +283,7 @@ $(function () {
                     let desiredDbId = undefined;
 
                     if (spool) {
-                       desiredDbId = spool.databaseId;
+                        desiredDbId = spool.databaseId;
                     }
 
                     if (desiredDbId === undefined) {
@@ -318,8 +313,6 @@ $(function () {
                                             type: 'info',
                                             buttons: {closer: true, sticker: false},
                                             hide: true,
-
-
                                         });
                                         notice.get().find(".button").remove();
                                     },
@@ -384,7 +377,6 @@ $(function () {
                                         hide: true,
                                     });
                                     notice.get().find(".button").remove();
-
                                 }
                             },
                                 {
@@ -401,8 +393,6 @@ $(function () {
                                             type: 'info',
                                             buttons: {closer: true, sticker: false},
                                             hide: true,
-
-
                                         });
                                         notice.get().find(".button").remove();
                                     },
@@ -423,7 +413,6 @@ $(function () {
                                             hide: true,
                                         });
                                         notice.get().find(".button").remove();
-
                                     }
                                 }
                             ]
@@ -432,11 +421,10 @@ $(function () {
                         },
                         // Close the notification after 5000 milliseconds (5 seconds)
                         autoClose: $(timeout) ? timeout * 1000 : 5000
-
                     });
 
                 }).catch((error) => {
-
+                    console.log("Error fetching spools:", error);
                 });
                 return;
             }

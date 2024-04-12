@@ -54,8 +54,6 @@ function activate_build_plate_buttons(response) {
                 $("#build-plate-list").prop('disabled', false);
                 $("#select-build-plate-button").prop('disabled', false);
                 $("#remove-build-plate-button").prop('disabled', false);
-
-
                 $("input[type='checkbox'][name='filament-checkbox']").prop('checked', false);
             }
         }
@@ -143,5 +141,4 @@ function activate_build_plate_buttons(response) {
     });
 
     $("#compatible-filaments-checkboxes").append(checkboxContainer); // Append the container to the main container
-
 }
