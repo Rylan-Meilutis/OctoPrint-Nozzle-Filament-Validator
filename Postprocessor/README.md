@@ -14,25 +14,36 @@ Unzip the folder and double click the <code>setup-postprocessor-exe.bat</code> f
 
 Copy the output and paste it into the post processor part of the slicer settings (found under print settings/output options in Prusa slicer).
 
-From now on, use either the provided spoolEditor.exe or the python script to edit the spool settings (editing the spool names to include in the gcode).
+From now on, use either the provided nvfPostprocessor.exe or the python script to edit the spool settings
+(editing the spool names to include in the gcode).
+
+When exporting the gcode, a window will pop up asking you to confirm the current settings. 
+If you are happy with the settings, click ok, otherwise edit the spools until they are correct.
 
 ### Mac and Linux
-*We will need the terminal for this, I promise it isn't too bad and you will be guided through it*
+*We will need the terminal for this, I promise it isn't too bad, and you will be guided through it*
 
 First download the postprocessor.zip file found in the release. 
 
 Unzip the folder and navigate to the folder in the terminal 
 
-- For gnome, open the folder in nautilus and right click and select open in terminal.
-- For mac, open the folder one level below the folder and right click the folder and select new terminal at folder.
+- For gnome, open the folder in nautilus and right-click and select open in terminal.
+- For mac, open the folder one level below the folder and right-click the folder and select new terminal at folder.
 - Alternatively, open the terminal and use cd to get to the directory 
 
 Then run the Following command: <code>sh setup_postprocessor.sh</code>.
 
-Copy the output and paste it into the post processor part of the slicer settings (found under print settings/output options in Prusa slicer).
+Copy the output and paste it into the post-processor part of the slicer settings
+(found under print settings/output options in Prusa slicer).
 
 For Mac users, we are all done with the terminal now.
 
-From now on, use either the provided spoolEditor application bundle (MacOS) or the python script (either OS) to edit the spool settings (editing the spool names to include in the gcode).
+From now on,
+use either the provided spoolEditor application bundle (macOS)
+or the python script (either OS) to edit the spool settings
+(editing the spool names to include in the gcode).
 
 (there is no executable for linux since there are so many different distros and desktop environments, but the python script should work just fine)
+
+When exporting the gcode, a window will pop up asking you to confirm the current settings. 
+If you are happy with the settings, click ok, otherwise edit the spools until they are correct.

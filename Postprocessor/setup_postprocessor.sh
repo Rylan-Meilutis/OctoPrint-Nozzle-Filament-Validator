@@ -14,5 +14,5 @@ echo
 echo "enter the following in your slicers post processor section:"
 echo
 python3 -m pip install -r requirements.txt
-echo "$(which python3) $(pwd)/postprocessor.py data.json"
+echo "$(which python3) $(pwd)/nvfPostprocessor.py"
 

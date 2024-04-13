@@ -1,4 +1,4 @@
-pyinstaller --noconfirm --onefile --console --name "postprocessor"  "postprocessor.py"
+pyinstaller --noconfirm --onefile --console --name "nvfPostprocessor"  "nvfPostprocessor.py"
 
 rm -r build
 

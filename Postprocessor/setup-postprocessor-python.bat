@@ -21,7 +21,7 @@ echo Enter the following in your slicers post processor section:
 echo.
 if "%python_installed%"=="true" (
     for /f "delims=" %%i in ('where python') do set "PYTHON_PATH=%%i"
-    echo %PYTHON_PATH% %cd%\postprocessor.py data.json
+    echo %PYTHON_PATH% %cd%\nvfPostprocessor.py
 ) else (
-    echo %cd%\postprocessor.exe data.json
+    echo %cd%\nvfPostprocessor.exe
 )
