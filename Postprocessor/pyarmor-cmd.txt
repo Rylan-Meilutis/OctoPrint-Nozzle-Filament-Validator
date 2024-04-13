@@ -1,0 +1,7 @@
+pyinstaller --noconfirm --onefile --console --name "postprocessor"  "postprocessor.py"
+
+rm -r build
+
+mv dist/* .
+
+rm -r dist
