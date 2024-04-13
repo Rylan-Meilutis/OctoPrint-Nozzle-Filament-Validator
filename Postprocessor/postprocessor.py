@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from __future__ import annotations
 
 import json
 import os
@@ -7,7 +8,7 @@ import sys
 from typing import Any, Union
 
 
-def main(gcode_path: str, json_path: Union[str, None] = None, json_data: Union[dict[str, str], None] = None) -> None:
+def main(gcode_path: str, json_path: Union[str, None] = None, json_data: Union[list[str], None] = None) -> None:
     """
     Main function,
     :param gcode_path: path to the gcode file
@@ -31,7 +32,7 @@ def main(gcode_path: str, json_path: Union[str, None] = None, json_data: Union[d
         file.write(new_file)
 
 
-def parse_json_file(json_path: str) -> list[Any]:
+def parse_json_file(json_path: str) -> list[str | None]:
     """
     Parse the json file and return the db ids in order
     :param json_path: path to the json file

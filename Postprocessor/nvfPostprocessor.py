@@ -8,3 +8,35 @@
 # You will be able to tell the difference based on the number of system arguments if there are none (len(sys.argv)
 # < 1) or the data isn't a path, then you are in stand-alone mode. If there is an argument, and it is a path,
 # then you are in postprocessor mode.
+
+# the following code is an example of how the app's structure could look like, feel free to change it as you see fit
+
+import sys
+
+import postprocessor
+
+
+class modes:
+    STAND_ALONE = "stand-alone"
+    POST_PROCESSOR = "post-processor"
+
+
+MODE = modes.STAND_ALONE
+
+
+def main() -> None:
+    if MODE == modes.POST_PROCESSOR:
+        json_data = postprocessor.parse_json_file(sys.argv[1])
+        # show interface to change and confirm the json data based on the length of the gcode data
+
+        postprocessor.main(sys.argv[1], json_data=json_data)
+
+    elif MODE == modes.STAND_ALONE:
+        # show interface to edit the json data and add/remove extruders
+        pass
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        MODE = modes.POST_PROCESSOR
+    main()
