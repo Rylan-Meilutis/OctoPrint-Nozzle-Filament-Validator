@@ -4,16 +4,22 @@ import json
 import os
 import re
 import sys
-from typing import Any
+from typing import Any, Union
 
 
-def main() -> None:
+def main(gcode_path: str, json_path: Union[str, None] = None, json_data: Union[dict[str, str], None] = None) -> None:
     """
-    Main function
+    Main function,
+    :param gcode_path: path to the gcode file
+    :param json_path: path to the json file
+    :param json_data: json data dictionary
     """
-    gcode_path = str(sys.argv[2])
-    json_path = str(sys.argv[1])
-    json_data = parse_json_file(json_path)
+    if json_data is None:
+        if json_path is None:
+            print("You must provide either a json file path or a json data dictionary")
+            sys.exit(1)
+        json_data = parse_json_file(json_path)
+
     gcode = parse_gcode(gcode_path)
     new_file = replace_names(gcode, json_data)
     # replace the last 1000 lines of the gcode with the new data
@@ -39,7 +45,7 @@ def parse_json_file(json_path: str) -> list[Any]:
         # get each db id and the corresponding extruder position and put then in order in a list
         out_list = [None] * len(data)
         for key, value in data.items():
-            out_list[int(key) -1 ] = value['sm_name']
+            out_list[int(key) - 1] = value['sm_name']
         return out_list
 
 
@@ -113,4 +119,6 @@ def replace_names(gcode: str, json_data: list[Any]) -> str:
 
 
 if __name__ == "__main__":
-    main()
+    GCODE_PATH = sys.argv[2]
+    JSON_PATH = sys.argv[1]
+    main(GCODE_PATH, JSON_PATH)
