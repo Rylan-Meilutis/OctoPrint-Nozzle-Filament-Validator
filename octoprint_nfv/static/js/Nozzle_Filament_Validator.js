@@ -116,6 +116,13 @@ function createExtruderTabs(extrudersArray, response) {
                 <p>The timeout determins how long it takes with no action until the print is aborted if the spool id in 
                 the gcode doesn't match the id in Spool Manager (default 300 seconds)</p>
             </div>
+            
+            <hr>
+            <!-- help info -->
+            <div>
+            <p>For help and usage info, visit <a href="https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator/blob/main/README.md">this</a> page</p>
+            <p>For help, setup, and usage info for the post-procesor, visit <a href="https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator/blob/main/Postprocesor/README.md">this</a> page</p>
+            </div>
         </div>
     `);
 
