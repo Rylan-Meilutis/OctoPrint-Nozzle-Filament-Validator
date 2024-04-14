@@ -26,15 +26,17 @@ def init_db(path: str) -> None:
     """
     # Connect to the SQLite database
     conn = get_db(path)
-    conn.execute("CREATE TABLE IF NOT EXISTS nozzles (id INTEGER PRIMARY KEY, size REAL)")
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS extruders (id INTEGER PRIMARY KEY, build_plate_id int, extruder_position int "
-        "UNIQUE)")
-    conn.execute("CREATE TABLE IF NOT EXISTS current_selections (id REAL PRIMARY KEY, selection INTEGER)")
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS build_plates (id INTEGER PRIMARY KEY, name REAL, compatible_filaments REAL)")
-    conn.execute("CREATE TABLE IF NOT EXISTS filament_data (id REAL PRIMARY KEY, data INTEGER)")
+    sql_file = os.path.join(os.path.dirname(__file__), "schema.sql")
+    try:
+        # Read SQL file
+        with open(sql_file, 'r') as file:
+            sql_script = file.read()
+    except FileNotFoundError:
+        return
+    # Execute SQL commands
+    conn.executescript(sql_script)
     conn.commit()
+    conn.close()
 
 
 def check_and_insert_to_db(data_path: str, logger: logging.Logger, row: str, value: any = 1) -> None:
