@@ -34,7 +34,7 @@ def main(gcode_path: str, json_path: Union[str, None] = None, json_data: Union[l
 
 def parse_json_file(json_path: str) -> list[str | None]:
     """
-    Parse the json file and return the db ids in order
+    Parse the json file and return the names in order of the extruders
     :param json_path: path to the json file
     :return: a list of db ids in order
     """
@@ -43,11 +43,21 @@ def parse_json_file(json_path: str) -> list[str | None]:
         json_path = os.path.join(os.path.dirname(__file__), json_path)
     with open(json_path, 'r') as file:
         data = json.load(file)
+        return parse_json_data(data)
         # get each db id and the corresponding extruder position and put then in order in a list
-        out_list = [None] * len(data)
-        for key, value in data.items():
-            out_list[int(key) - 1] = value['sm_name']
-        return out_list
+
+
+def parse_json_data(json_data: dict[str, Any]) -> list[str | None]:
+    """
+    Parse the json data and return the names in order of the extruders
+    :param json_data: the json data dictionary
+    :return: a list of db ids in order
+    """
+    # get each db id and the corresponding extruder position and put then in order in a list
+    out_list = [None] * len(json_data)
+    for key, value in json_data.items():
+        out_list[int(key) - 1] = value['sm_name']
+    return out_list
 
 
 def parse_gcode(gcode_path: str) -> str:

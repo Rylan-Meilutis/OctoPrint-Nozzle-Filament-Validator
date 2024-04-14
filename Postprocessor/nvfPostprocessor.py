@@ -7,13 +7,17 @@
 # mode, where it allows editing of the current extruders and the names of the spools that should be used.
 # You will be able to tell the difference based on the number of system arguments if there are none (len(sys.argv)
 # < 1) or the data isn't a path, then you are in stand-alone mode. If there is an argument, and it is a path,
-# then you are in postprocessor mode.
+# then you are in postprocessor mode. If the app is closed without saving, it should ask the user if they want to save.
 
-# the following code is an example of how the app's structure could look like, feel free to change it as you see fit
+from __future__ import annotations
 
+import json
 import sys
 
 import postprocessor
+
+
+# the following code is an example of how the app's structure could look like, feel free to change it as you see fit
 
 
 class modes:
@@ -26,14 +30,32 @@ MODE = modes.STAND_ALONE
 
 def main() -> None:
     if MODE == modes.POST_PROCESSOR:
-        json_data = postprocessor.parse_json_file(sys.argv[1])
-        # show interface to change and confirm the json data based on the length of the gcode data
-
-        postprocessor.main(sys.argv[1], json_data=json_data)
+        json_data = post_processor_mode()
+        postprocessor.main(sys.argv[1], json_data=postprocessor.parse_json_data(json_data))
 
     elif MODE == modes.STAND_ALONE:
-        # show interface to edit the json data and add/remove extruders
-        pass
+        stand_alone_mode()
+
+
+def stand_alone_mode() -> None:
+    # show interface to edit the json data and add/remove extruders
+    json_data = json.load(open(sys.argv[1], 'r'))
+    # the app
+
+    # save the file and return the data
+    with open(sys.argv[1], 'w') as file:
+        json.dump(json_data, file)
+
+
+def post_processor_mode() -> dict[str, None]:
+    # show interface to change and confirm the json data based on the length of the gcode data
+    json_data = json.load(open(sys.argv[1], 'r'))
+    # the app
+
+    # save the file and return the data
+    with open(sys.argv[1], 'w') as file:
+        json.dump(json_data, file)
+    return json_data
 
 
 if __name__ == "__main__":
