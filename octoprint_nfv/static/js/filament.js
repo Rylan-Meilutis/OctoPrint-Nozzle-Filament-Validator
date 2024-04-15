@@ -77,7 +77,9 @@ function updateSpool(dbID, extruderPos) {
 function get_spools() {
     return new Promise((resolve, reject) => {
         $.ajax({
-            url: self.location.href.substring(0, self.location.href.lastIndexOf('/')) + "/plugin/SpoolManager/loadSpoolsByQuery?selectedPageSize=100000&from=0&to=100000&sortColumn=displayName&sortOrder=desc&filterName=&materialFilter=all&vendorFilter=all&colorFilter=all",
+            url: self.location.href.substring(0, self.location.href.lastIndexOf('/')) + "/plugin/SpoolManager/" +
+                "loadSpoolsByQuery?selectedPageSize=100000&from=0&to=100000&sortColumn=displayName&sortOrder=desc&" +
+                "filterName=&materialFilter=all&vendorFilter=all&colorFilter=all",
             dataType: "json",
             contentType: "application/json; charset=UTF-8",
             type: "GET"

@@ -20,6 +20,7 @@ echo.
 echo Enter the following in your slicers post processor section:
 echo.
 if "%python_installed%"=="true" (
+    python -m pip install --upgrade -r requirements.txt
     for /f "delims=" %%i in ('where python') do set "PYTHON_PATH=%%i"
     echo %PYTHON_PATH% %cd%\nvfPostprocessor.py
 ) else (

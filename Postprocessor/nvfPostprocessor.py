@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 import sys
 
+import requests
+
 import postprocessor
 
 
@@ -26,9 +28,19 @@ class modes:
 
 
 MODE = modes.STAND_ALONE
+# Settings schema should include all settings you with to include (light mode, dark mode, etc.) and the url of the
+# octoprint server.
+# The url stuff should be in place already including the ability to check if the url is correct and get the loaded
+# filament spools.
+# The load and save settings are also already implemented
+SETTINGS_PATH = "nvfsettings.json"
 
 
 def main() -> None:
+    """
+    Main function
+    :return:
+    """
     if MODE == modes.POST_PROCESSOR:
         json_data = post_processor_mode()
         postprocessor.main(sys.argv[1], json_data=postprocessor.parse_json_data(json_data))
@@ -38,8 +50,14 @@ def main() -> None:
 
 
 def stand_alone_mode() -> None:
+    """
+    Stand alone mode
+    :return:
+    """
+
     # show interface to edit the json data and add/remove extruders
     json_data = json.load(open(sys.argv[1], 'r'))
+    settings = load_settings()
     # the app
 
     # save the file and return the data
@@ -48,14 +66,81 @@ def stand_alone_mode() -> None:
 
 
 def post_processor_mode() -> dict[str, None]:
+    """
+    Post processor mode
+    :return:
+    """
     # show interface to change and confirm the json data based on the length of the gcode data
     json_data = json.load(open(sys.argv[1], 'r'))
+
+    settings = load_settings()
+
     # the app
 
     # save the file and return the data
     with open(sys.argv[1], 'w') as file:
         json.dump(json_data, file)
     return json_data
+
+
+def save_settings(json_data: dict[str, None]) -> None:
+    """
+    Save the settings to the json file
+    :param json_data: the json data
+    :return:
+    """
+    with open(SETTINGS_PATH, 'w') as file:
+        json.dump(json_data, file)
+
+
+def load_settings() -> dict[str, None]:
+    """
+    Load the settings from the json file
+    :return: the json data or an empty dictionary if the file does not exist
+    """
+    try:
+        return json.load(open(SETTINGS_PATH, 'r'))
+    except FileNotFoundError:
+        return {}
+
+
+def check_octoprint_settings(url: str) -> bool | str:
+    """
+    Check the octoprint settings
+    :param url: the base octoprint url
+    :return: True if the settings are correct, the error message otherwise
+    """
+    try:
+        requests.get(url=url)
+    except requests.exceptions.ConnectionError as e:
+        return f"Could not connect to the octoprint server: \"{e}\""
+
+    return True
+
+
+def get_loaded_spools(url: str) -> list[str] | None:
+    """
+    Get the loaded spools from octoprint
+    :param url: the base octoprint url
+    :return: a list of the loaded spools name or None if there was an error
+    """
+    # get the spools from the database
+    # return the spools
+    api_path = ("/plugin/SpoolManager/loadSpoolsByQuery?selectedPageSize=100000&from=0&to=100000&sortColumn"
+                "=displayName&sortOrder=desc&filterName=&materialFilter=all&vendorFilter=all&colorFilter=all")
+    try:
+        json_data = requests.get(url + api_path).json()
+    except requests.exceptions.ConnectionError:
+        return None
+    except json.JSONDecodeError:
+        return None
+    # remove all except loaded spools
+    json_data = json_data["selectedSpools"]
+    # create a list where each element is the name of a spool, the spools are in order of the extruders in the json
+    # response
+    spool_data = [spool["displayName"] for spool in json_data]
+    # the app
+    return spool_data
 
 
 if __name__ == "__main__":

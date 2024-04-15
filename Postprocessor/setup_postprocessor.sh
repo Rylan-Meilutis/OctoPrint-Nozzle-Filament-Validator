@@ -13,6 +13,6 @@ echo "Postprocessor setup complete."
 echo
 echo "enter the following in your slicers post processor section:"
 echo
-python3 -m pip install -r requirements.txt
+python3 -m pip install --upgrade -r requirements.txt
 echo "$(which python3) $(pwd)/nvfPostprocessor.py"
 
