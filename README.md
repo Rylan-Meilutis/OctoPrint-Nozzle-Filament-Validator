@@ -69,6 +69,8 @@ print.
 
 <b>This option is disabled by default</b>
 
+<b>* This feature is case-sensitive *</b>
+
 As of current, the plugin can check that the correct spool is loaded in each extruder.
 This is done by checking the database id of the spool in the spool manager plugin.
 If the correct spool is not loaded, it will notify you of the error and allow you to pick between three options:
@@ -76,6 +78,7 @@ Confirm the correct spool is loaded (this will switch the loaded spool in spool 
 cancel the print, or ignore the incorrect spool (will continue the print with the current loaded spool).
 With either selection, the filament type will be checked after the spool is selected or ignored,
 so filament type checking remains the same.
+
 
 There is also a timeout that can be adjusted in the settings.
 This is the time in seconds that the plugin will wait before failing the print.
