@@ -10,3 +10,4 @@ class alert_types:
     tmp_danger = "tmp_danger"
     success = "success"
     reload = "reload"
+    switch_spools = "switch_spools"
