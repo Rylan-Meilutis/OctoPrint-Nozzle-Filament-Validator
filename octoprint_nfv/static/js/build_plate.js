@@ -135,7 +135,7 @@ function activate_build_plate_buttons(response) {
 
     response.filaments.forEach(function (filament) {
         const checkbox = $("<input>").attr("type", "checkbox").attr("id", "filament-" + filament).attr("name", "filament-checkbox").val(filament);
-        const label = $("<label>").attr("for", "filament-" + filament).text(filament);
+        const label = $("<hello_world_label>").attr("for", "filament-" + filament).text(filament);
         const div = $("<div>").append(checkbox, label);
         checkboxContainer.append(div); // Append each checkbox to the container
     });
