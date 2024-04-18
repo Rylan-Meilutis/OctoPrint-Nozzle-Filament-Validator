@@ -1,9 +1,6 @@
 # coding=utf-8
 from __future__ import absolute_import, annotations
 
-import sqlite3
-import time
-
 import flask
 import octoprint.plugin
 from flask_login import current_user
@@ -16,6 +13,7 @@ import octoprint_nfv.nozzle as nozzle
 import octoprint_nfv.validate as validate
 from octoprint_nfv.constants import alert_types
 from octoprint_nfv.db import get_db, init_db
+from octoprint_nfv.filament import filament
 from octoprint_nfv.spoolManager import SpoolManagerIntegration
 
 
@@ -39,6 +37,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self.build_plate: build_plate = None
         self.extruders: extruders = None
         self.validator: validate = None
+        self.filament: filament = None
 
     def get_api_commands(self):
         """
@@ -57,7 +56,10 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             get_build_plate=["buildPlateId"],
             update_extruder=["extruderPosition", "nozzleId"],
             get_extruder_info=["extruderId"],
-            get_loaded_filaments=[]
+            get_loaded_filaments=[],
+            updateWaitState=["state"],
+            update_filament_timeout=["timeout"],
+            update_check_spool_id=["checkSpoolId"],
         )
 
     def on_api_get(self, request: flask.Request) -> flask.Response:
@@ -75,11 +77,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         current_build_plate_filaments = self.build_plate.get_current_build_plate_filaments()
         filaments = build_plate.get_filament_types()
         is_multi_extruder = str(self.extruders.is_multi_tool_head())
-
+        check_ids = str(self.filament.get_enable_spool_checking())
+        check_spool_id_timeout = self.filament.get_timeout()
         return flask.jsonify(nozzles=nozzles, number_of_extruders=number_of_extruders,
                              build_plates=build_plates, currentBuildPlate=current_build_plate,
                              currentBuildPlateFilaments=current_build_plate_filaments, filaments=filaments,
-                             isMultiExtruder=is_multi_extruder)
+                             isMultiExtruder=is_multi_extruder, check_spool_id=check_ids,
+                             check_spool_id_timeout=check_spool_id_timeout)
 
     def on_api_command(self, command: str, data: dict) -> flask.response:
         """
@@ -205,12 +209,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                     nozzle_size = self.extruders.get_nozzle_size_for_extruder(extruder_id)
                     extruder_position = extruder_id
                     try:
-                        filament = self._spool_manager.get_loaded_filaments()[extruder_position - 1]
+                        filaments = self._spool_manager.get_loaded_filaments()[extruder_position - 1]
                     except Exception as e:
                         self._logger.error(f"Error retrieving filament info: {e}")
-                        filament = None
+                        filaments = None
                     return flask.jsonify(nozzleSize=nozzle_size, extruderPosition=extruder_position,
-                                         filamentType=filament)
+                                         filamentType=filaments,
+                                         spoolName=self._spool_manager.get_names()[extruder_position - 1])
                 except Exception as e:
                     self.send_alert(f"Error retrieving extruder info: {e}", alert_types.tmp_error)
                     return flask.abort(500)
@@ -218,6 +223,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         elif command == "get_loaded_filaments":
             try:
                 filaments = str(self._spool_manager.get_loaded_filaments()).replace("[", "").replace("]", "")
+                self._spool_manager.get_names()
                 return flask.jsonify(filaments=filaments)
             except Exception as e:
                 self.send_alert(f"Error retrieving filament info: {e}", alert_types.tmp_error)
@@ -232,6 +238,27 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                 except Exception as e:
                     self.send_alert(f"Error setting multiple tool heads: {e}", alert_types.error)
                 return flask.abort(500)
+
+        elif command == "updateWaitState":
+            data = data.get("state")
+            if data is not None:
+                self.validator.update_filament_wait_status(data)
+                return flask.jsonify(success=True)
+            flask.abort(400)
+
+        elif command == "update_filament_timeout":
+            data = data.get("timeout")
+            if data is not None:
+                self.filament.update_timeout(int(data))
+                return flask.jsonify(success=True)
+            flask.abort(400)
+
+        elif command == "update_check_spool_id":
+            data = data.get("checkSpoolId")
+            if data is not None:
+                self.filament.update_enable_spool_checking(bool(data))
+                return flask.jsonify(success=True)
+            flask.abort(400)
         return flask.abort(400)
 
     def send_alert(self, message: str, alert_type: str = alert_types.popup) -> None:
@@ -263,86 +290,26 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self.build_plate = build_plate.build_plate(self.get_plugin_data_folder(), self._logger)
         self.extruders = extruders.extruders(self.nozzle, self.get_plugin_data_folder(), self._logger,
                                              self._printer_profile_manager)
+        self.filament = filament(self.get_plugin_data_folder(), self._logger)
+
         self.validator = validate.validator(self.nozzle, self.build_plate, self.extruders, self._spool_manager,
+                                            self.filament,
                                             self._printer, self._logger, self._plugin_manager, self._identifier,
                                             self._printer_profile_manager)
 
-        # Retry inserting a row into current_selections with a maximum of 3 attempts
-        def check_and_insert_to_db(column: str, value: any = 1) -> None:
-            """
-            Check if the column exists in the current_selections table and insert it if it does not
-            :param column: the column to check
-            :param value: the value to insert
-            """
-            try:
-                retry = 0
-                index = conn.cursor()
-
-                # Check if the table already exists in the table schema
-                index.execute("SELECT COUNT(*) FROM current_selections WHERE id = ?",
-                              (str(column),))
-                exists = index.fetchone()[0]
-
-                if not exists:
-                    while retry < 3:
-                        try:
-                            index.execute("INSERT INTO current_selections (id, selection) VALUES (?, ?)",
-                                          (column, value))
-                            conn.commit()
-                            break
-                        except sqlite3.OperationalError as error:
-                            self._logger.warning(f"Database operation failed: {error}")
-                            self._logger.warning("Retrying...")
-                            retry += 1
-                            time.sleep(1)  # Wait for 1 second before retrying
-
-                    if retry == 3:
-                        self._logger.error(
-                            "Failed to insert row into current_selections after multiple attempts. Plugin "
-                            "initialization may be incomplete.")
-            except Exception as error:
-                self._logger.error(f"Error adding nozzle to the database: {error}")
-
-        def add_row_to_db(table: str, insert_function: callable, params: tuple) -> None:
-            """
-            Add a row to a database
-            :param table: the table to add the row to
-            :param insert_function: the function to insert the row
-            :param params: the parameters to pass to the insert function
-            """
-            try:
-                retries = 0
-                cursor = conn.cursor()
-                cursor.execute(f"SELECT COUNT(*) FROM {table}")
-                count = cursor.fetchone()[0]
-                if int(count) == 0:
-                    while retries < 3:
-                        try:
-                            insert_function(*params)
-                            break
-                        except sqlite3.OperationalError as e:
-                            self._logger.warning(f"Database operation failed: {e}")
-                            self._logger.warning("Retrying...")
-                            retries += 1
-                            time.sleep(1)  # Wait for 1 second before retrying
-
-                    if retries == 3:
-                        self._logger.error(
-                            "Failed to insert row into current_selections after multiple attempts. Plugin "
-                            "initialization "
-                            "may "
-                            "be incomplete.")
-            except Exception as e:
-                self._logger.error(f"Error adding to the database: {e}")
-
         # Check if the nozzle and build plate columns exist in the current_selections table
-        check_and_insert_to_db("build_plate")
-        # Add default nozzle and build plate to the database
-        add_row_to_db("nozzles", self.nozzle.add_nozzle_to_database, (0.4,))
-        add_row_to_db("build_plates", self.build_plate.insert_build_plate_to_database,
-                      ("Generic", "PLA, PETG, ABS", "1"))
+        db.check_and_insert_to_db(self.get_plugin_data_folder(), self._logger, "build_plate")
 
-        add_row_to_db("extruders", self.extruders.add_extruder_to_database, (1, 1))
+        # Add default nozzle and build plate to the database
+        db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "nozzles", self.nozzle.add_nozzle_to_database,
+                         (0.4,))
+        db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "build_plates",
+                         self.build_plate.insert_build_plate_to_database, ("Generic", "PLA, PETG, ABS", "1"))
+
+        db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "extruders",
+                         self.extruders.add_extruder_to_database, (1, 1))
+        db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "filament_data",
+                         self.filament.initial_db_add, (False, 300), 2)
 
         self.extruders.update_data()
         conn.close()

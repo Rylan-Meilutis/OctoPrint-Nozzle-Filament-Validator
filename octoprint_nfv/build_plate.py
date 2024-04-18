@@ -1,5 +1,6 @@
-from octoprint_nfv.db import get_db
 from typing import NoReturn, Any, Union
+
+from octoprint_nfv.db import get_db
 
 
 def get_filament_types():
@@ -7,8 +8,26 @@ def get_filament_types():
     Get the filament types
     :return: the available filament types
     """
-    return ["PLA", "PETG", "ASA", "ABS", "TPU", "Nylon", "PC", "Wood", "Metal", "Carbon Fiber", "PVA", "HIPS",
-            "PETT", "PP", "PEI", "POM", "PMMA", "PBT", "PES", "PC-ABS", "PPO", "PEEK", "PEKK", "PEI", "PES"]
+
+    return ["PLA",
+            "PLA_plus",
+            "PETG",
+            "ABS",
+            "NYLON",
+            "TPU",
+            "PC",
+            "Wood",
+            "Carbon Fiber",
+            "PC_ABS",
+            "HIPS",
+            "PVA",
+            "BVOH",
+            "ASA",
+            "PP",
+            "POM",
+            "PMMA",
+            "FPE"
+            ]
 
 
 class build_plate:
@@ -23,12 +42,11 @@ class build_plate:
         :param logger: logger for outputting errors
         """
         super().__init__()
-        self._conn = None
         self._spool_manager = None
         self.data_folder = data_folder
         self._logger = logger
 
-    def fetch_build_plates_from_database(self) -> list[dict[str,Any]]:
+    def fetch_build_plates_from_database(self) -> list[dict[str, Any]]:
         """
         Fetch all build plates from the database
         :return: a list of all available build plates

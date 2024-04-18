@@ -8,6 +8,7 @@ class nozzle:
     """
     Class to handle nozzle operations
     """
+
     def __init__(self, data_folder: str, logger: logging.Logger) -> None:
         """
         Constructor
@@ -15,7 +16,6 @@ class nozzle:
         :param logger: the logger instance
         """
         super().__init__()
-        self._conn = None
         self.data_folder = data_folder
         self._logger = logger
 
