@@ -9,17 +9,6 @@ stages:
   - build
   - test
 
-
-#compile-macos:
-#  stage: build
-#  image: sickcodes/docker-osx:auto
-#  script:
-#    - echo "Compiling for macOS"
-#    - python3 -m pip install --upgrade pip
-#    - pip install auto-py-to-exe
-#    - auto-py-to-exe --onefile --noconfirm --icon=icon.ico app/nvfPostprocessor.py
-
-
 sast:
   stage: test
 include:
