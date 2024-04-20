@@ -3,3 +3,4 @@ recursive-include octoprint_nfv/templates *
 recursive-include octoprint_nfv/translations *
 recursive-include octoprint_nfv/static *
 recursive-include octoprint_nfv
+include octoprint_nfv/schema.sql
