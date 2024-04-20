@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS nozzles
 CREATE TABLE IF NOT EXISTS extruders
 (
     id                INTEGER PRIMARY KEY,
-    build_plate_id    int,
+    nozzle_id         int,
     extruder_position int UNIQUE
 );
 CREATE TABLE IF NOT EXISTS current_selections

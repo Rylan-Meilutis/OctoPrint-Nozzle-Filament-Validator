@@ -280,11 +280,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         """
         Initialize the plugin
         """
+
+        init_db(self.get_plugin_data_folder())
+
         conn = get_db(self.get_plugin_data_folder())
 
         spool_manager_plugin = self._plugin_manager.plugins.get("SpoolManager").implementation
         self._spool_manager = SpoolManagerIntegration(spool_manager_plugin, self._logger)
-        init_db(self.get_plugin_data_folder())
 
         self.nozzle = nozzle.nozzle(self.get_plugin_data_folder(), self._logger)
         self.build_plate = build_plate.build_plate(self.get_plugin_data_folder(), self._logger)
