@@ -121,7 +121,7 @@ function createExtruderTabs(extrudersArray, response) {
             <!-- help info -->
             <div>
             <p>For help and usage info, visit <a href="https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator/blob/main/README.md" target="_blank">this</a> page</p>
-            <p>For help, setup, and usage info for the post-procesor, visit <a href="https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator/blob/main/Postprocesor/README.md" target="_blank">this</a> page</p>
+            <p>For help, setup, and usage info for the post-procesor, visit <a href="https://github.com/Rylan-Meilutis/Nozzle-Filament-Post-Processor" target="_blank">this</a> page</p>
             </div>
         </div>
     `);
