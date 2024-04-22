@@ -82,12 +82,7 @@ so filament type checking remains the same.
 
 There is also a timeout that can be adjusted in the settings.
 This is the time in seconds that the plugin will wait before failing the print.
-
-### Post-Processor
-Having a different filament profile for each spool can be a pain, especially if you have a lot of spools. 
-So a post-processing script has been developed to make it easier to add the spool data to the gcode. 
-This is not required to use the plugin, but it can make it easier to manage your spools.
-Information on how to use the post-processor can be found [here](https://github.com/Rylan-Meilutis/Nozzle-Filament-Post-Processor/)
+![img.png](assets/img/plugins/Nozzle_Filament_Validator/enable_spool_checking.png)
 
 ### Slicer config
 
@@ -99,6 +94,13 @@ The plugin will look for the following settings in the notes section of the fila
 Image of the settings in Prusa slicer:
 
 ![Filament notes](assets/img/plugins/Nozzle_Filament_Validator/filament_notes_config.png)
+
+### Post-Processor
+Having a different filament profile for each spool can be a pain, especially if you have a lot of spools. 
+So a post-processing script has been developed to make it easier to add the spool data to the gcode. 
+This is not required to use the plugin, but it can make it easier to manage your spools.
+Information on how to use the post-processor can be found [here](https://github.com/Rylan-Meilutis/Nozzle-Filament-Post-Processor/)
+
 
 ## In Development
 
