@@ -113,7 +113,7 @@ function createExtruderTabs(extrudersArray, response) {
             <div class="form-group">
                 <label for="check-spool-id-timeout-input">Check Spool ID Timeout</label>
                 <input type="number" id="check-spool-id-timeout-input" placeholder="Enter timeout" step="1" value="${response.check_spool_id_timeout}">
-                <p>The timeout determins how long it takes with no action until the print is aborted if the spool id in 
+                <p>The timeout determines how long it takes with no action until the print is aborted if the spool id in 
                 the gcode doesn't match the id in Spool Manager (default 300 seconds)</p>
             </div>
             
