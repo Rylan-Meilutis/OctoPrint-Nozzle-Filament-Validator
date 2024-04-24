@@ -9,6 +9,6 @@
 .
 
 setuptools>=68.2.0
-OctoPrint>=1.9.3
+OctoPrint>=1.10.0
 
 Flask>=2.2.5
