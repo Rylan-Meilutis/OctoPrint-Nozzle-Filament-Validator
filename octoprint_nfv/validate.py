@@ -195,6 +195,7 @@ class validator:
         checks fail.
         :param file_path: The path to the GCODE file
         """
+        self.paused = False
         if not os.path.exists(file_path):
             self.send_alert(f"File {file_path} not found, no checks will be performed. Press RESUME to continue "
                             f"anyways", alert_types.error)
@@ -229,6 +230,8 @@ class validator:
                 # if no filament was used, assume the tool isn't used and skip the check
                 if float(filament_used[i]) == 0:
                     continue
+            else:  # if the filament used is None, assume the tool isn't used and skip the check for that tool
+                continue
 
             spool_pass, spool_passed = self.check_spool_id(i, gcode_info, spool_passed)
             if not spool_pass:
@@ -241,7 +244,7 @@ class validator:
             self.send_alert(f"Error retrieving loaded filament: {e}", alert_types.error)
             return
 
-        if not self.check_num_filaments(loaded_filaments, filament_types, mmu_single_mode):
+        if not self.check_num_filaments(loaded_filaments, filament_types, filament_used):
             return
 
         if not self.check_num_extruders(nozzles):
@@ -301,9 +304,15 @@ class validator:
         :param printer_model: the printer model in the GCODE
         :return: true if the printer model passes the check
         """
-        if printer_model is None:
+        if printer_model is None or printer_model == "":
             self.send_alert("No printer model found in GCODE, printer model checking won't be performed",
                             alert_types.info)
+            return True
+
+        elif self.get_printer_model() is None or self.get_printer_model() == "":
+            self.send_alert("No printer model set in OctoPrint, printer model checking won't be performed",
+                            alert_types.info)
+            return True
 
         elif (printer_model is not None and printer_model.lower() != self.get_printer_model().lower() and printer_model
               != ""):
@@ -345,43 +354,34 @@ class validator:
             self._printer.cancel_print()
             return False, mmu_single_mode
 
-        # Check if the number of nozzles in the GCODE is shorter than the number of extruders on the printer
-        elif len(nozzles) < self.extruders.get_number_of_extruders() and not mmu_single_mode:
-            self.send_alert(
-                f"Print paused: Number of nozzles in gcode ({len(nozzles)}) is shorter than the number of extruders("
-                f"{self.extruders.get_number_of_extruders()}). Press RESUME to continue", alert_types.info)
-            self.pause_print()
-
         return True, mmu_single_mode
 
-    def check_num_filaments(self, loaded_filaments: list[str], filament_types: list[str], mmu_single_mode: bool) -> (
-            bool):
+    def check_num_filaments(self, loaded_filaments: list[str], filament_types: list[str],
+                            filament_used: list[str], ) -> bool:
         """
         Check the number of filaments in the GCODE
+
         :param loaded_filaments: The loaded filaments from the spool manager
         :param filament_types: the filament types from the GCODE
-        :param mmu_single_mode: whether the printer is in mmu single mode
+        :param filament_used: the filament used from the GCODE
         :return: true if the check passed
         """
         # Check if the number of filament types in the GCODE is longer than the number of extruders on the printer
-        fil_length = 0
-        for i in loaded_filaments:
-            if i is not None:
-                fil_length += 1
-        if len(filament_types) > fil_length:
+        loaded_fil_length = len(loaded_filaments)
+        needed_fil_length = len(filament_types)
+
+        for i in range(len(filament_types)):
+            if filament_used[i] is not None:
+                # if no filament was used, assume the tool isn't used and skip the check
+                if float(filament_used[i]) == 0:
+                    needed_fil_length -= 1
+
+        if needed_fil_length > loaded_fil_length:
             self.send_alert(
-                f"Loaded filaments ({fil_length}) is shorter than the number specified in the gcode "
+                f"Loaded filaments ({loaded_fil_length}) is shorter than the number specified in the gcode "
                 f"({len(filament_types)})", alert_types.error)
             self._printer.cancel_print()
             return False
-
-        # Check if the number of filament types in the GCODE is shorter than the number of extruders on the
-        # printer
-        elif len(filament_types) < self.extruders.get_number_of_extruders() and not mmu_single_mode:
-            self.send_alert(
-                f" Print paused: loaded filaments ({len(loaded_filaments)}) is longer than the number specified in "
-                f"the gcode ({len(filament_types)}). Press RESUME to continue", alert_types.info)
-            self.pause_print()
 
         return True
 
