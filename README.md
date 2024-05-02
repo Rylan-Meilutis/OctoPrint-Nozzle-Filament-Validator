@@ -107,6 +107,8 @@ Information on how to use the post-processor can be found [here](https://github.
 Nothing major at the moment, just bug fixes, removing unused functions, and other minor improvements.
 
 ## Coming Soon
+- Add the ability to change the spool type in the gcode from the octoprint webui.
+
 
 - Add the ability to scan the gcode before starting a print to verify the settings
 - Add the ability to auto scan new files for compatability when they are uploaded and remove them if they are not
