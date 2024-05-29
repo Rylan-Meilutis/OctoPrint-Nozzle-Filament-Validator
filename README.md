@@ -72,7 +72,7 @@ print.
 <b>* This feature is case-sensitive *</b>
 
 As of current, the plugin can check that the correct spool is loaded in each extruder.
-This is done by checking the database id of the spool in the spool manager plugin.
+This is done by checking the name of the spool in the spool manager plugin.
 If the correct spool is not loaded, it will notify you of the error and allow you to pick between three options:
 Confirm the correct spool is loaded (this will switch the loaded spool in spool manager),
 cancel the print, or ignore the incorrect spool (will continue the print with the current loaded spool).
@@ -107,7 +107,7 @@ Information on how to use the post-processor can be found [here](https://github.
 Nothing major at the moment, just bug fixes, removing unused functions, and other minor improvements.
 
 ## Coming Soon
-- Add the ability to change the spool type in the gcode from the octoprint webui.
+-  ** Add the ability to change the spool type in the gcode from the octoprint webui.
 
 
 - Add the ability to scan the gcode before starting a print to verify the settings
