@@ -121,6 +121,8 @@ def remove_mmu_from_end(text: str) -> str:
         return re.sub(r'mmu[23](s)?is$', 'is', text)
     elif bool(re.match(r".*ismmu[23](s)?$|^ismmu[23](s)?$", text)):
         return re.sub(r'ismmu[23](s)?$', 'is', text)
+    else:
+        return text
 
 
 def remove_is_from_end(text: str) -> str:
