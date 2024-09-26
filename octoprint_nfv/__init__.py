@@ -1,6 +1,8 @@
 # coding=utf-8
 from __future__ import absolute_import, annotations
 
+from typing import Dict, List
+
 import flask
 import octoprint.plugin
 from flask_login import current_user
@@ -85,7 +87,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                              isMultiExtruder=is_multi_extruder, check_spool_id=check_ids,
                              check_spool_id_timeout=check_spool_id_timeout)
 
-    def on_api_command(self, command: str, data: dict) -> flask.response:
+    def on_api_command(self, command: str, data: Dict) -> flask.response:
         """
         Handle the API commands from the frontend
         :param command: the command to handle
@@ -341,7 +343,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     # ~~ TemplatePlugin mixin
 
-    def get_template_configs(self) -> list[dict[str, str | bool]]:
+    def get_template_configs(self) -> List[Dict[str, str | bool]]:
         """
         get the html templete for the plugin
         :return: the html template
@@ -353,7 +355,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     # ~~ AssetPlugin mixin
 
-    def get_assets(self) -> dict[str, list[str]]:
+    def get_assets(self) -> Dict[str, List[str]]:
         """
         returns the web assets for the plugin
         :return: the web assets
