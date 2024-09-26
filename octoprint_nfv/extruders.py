@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, List, Dict
 
 from octoprint_nfv.db import get_db
 
@@ -24,7 +24,7 @@ class extruders:
         self._nozzle = nozzle
         self._printer_profile_manager = _printer_profile_manager
 
-    def fetch_extruders_from_database(self) -> list[dict[str, Any]]:
+    def fetch_extruders_from_database(self) -> List[Dict[str, Any]]:
         """
         Fetch all extruders from the database
         :return: a list of all available extruders
@@ -182,7 +182,7 @@ class extruders:
                 cursor.execute("UPDATE extruders SET nozzle_id = ? WHERE id != ?", (nozzle_id, db_id))
         con.commit()
 
-    def get_extruder_info(self, extruder_position: int) -> list[dict[str, Any]]:
+    def get_extruder_info(self, extruder_position: int) -> List[Dict[str, Any]]:
         """
         Get the extruder info
         :param extruder_position: position of the extruder

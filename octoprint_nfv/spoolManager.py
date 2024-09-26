@@ -1,7 +1,6 @@
 import json
 import logging
-from typing import Any
-from typing import Union
+from typing import Any, List, Dict, Union
 
 from octoprint.server import app
 
@@ -20,7 +19,7 @@ class SpoolManagerIntegration:
         self._logger = logger
         self._impl = impl
 
-    def get_materials(self) -> list[str]:
+    def get_materials(self) -> List[str]:
         """
         Get the materials from the Spool Manager
         :return:
@@ -40,7 +39,7 @@ class SpoolManagerIntegration:
             )
             return []
 
-    def allowed_to_print(self) -> dict[str, Any]:
+    def allowed_to_print(self) -> Dict[str, Any]:
         """
         Check if the printer is allowed to print
         :return: the response from the Spool Manager
@@ -53,7 +52,7 @@ class SpoolManagerIntegration:
             )
         return json.loads(r.data)
 
-    def start_print_confirmed(self) -> dict[str, Any]:
+    def start_print_confirmed(self) -> Dict[str, Any]:
         """
         Start of a print job confirmed
         :return: information about the print job
@@ -83,7 +82,7 @@ class SpoolManagerIntegration:
             self._logger.error(f"Error retrieving loaded filament: {e}")
             return None
 
-    def get_loaded_filaments(self) -> Union[list[str], int, None]:
+    def get_loaded_filaments(self) -> Union[List[str], int, None]:
         """
         Get the currently loaded filaments
         :return: a list of the currently loaded filaments
@@ -112,7 +111,7 @@ class SpoolManagerIntegration:
             self._logger.error(f"Error retrieving loaded filament: {e}")
             return -2
 
-    def get_names(self) -> Union[list[str], None]:
+    def get_names(self) -> Union[List[str], None]:
         """
         Get the name of the spools
         :return: the name of the spool
@@ -136,7 +135,7 @@ class SpoolManagerIntegration:
             )
             return []
 
-    def get_db_id(self) -> Union[list[str], None]:
+    def get_db_id(self) -> Union[List[str], None]:
         """
         Get the database id's of the spools
         :return: the db_id's of the spool
