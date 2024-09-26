@@ -1,4 +1,4 @@
-from typing import NoReturn, Any, Union
+from typing import NoReturn, Any, Union, Dict, List
 
 from octoprint_nfv.db import get_db
 
@@ -46,7 +46,7 @@ class build_plate:
         self.data_folder = data_folder
         self._logger = logger
 
-    def fetch_build_plates_from_database(self) -> list[dict[str, Any]]:
+    def fetch_build_plates_from_database(self) -> List[Dict[str, Any]]:
         """
         Fetch all build plates from the database
         :return: a list of all available build plates
@@ -136,7 +136,7 @@ class build_plate:
             self._logger.error("No current build plate ID found in the database")
             return None
 
-    def get_current_build_plate_filaments(self) -> Union[list[str], None]:
+    def get_current_build_plate_filaments(self) -> Union[List[str], None]:
         """
         Get the current build plate filaments
         :return: a list of the current build plate filaments or none if not found
@@ -209,7 +209,7 @@ class build_plate:
         result = cursor.fetchone()
         return result[0] if result else None
 
-    def get_build_plate_filaments_by_id(self, build_plate_id: int) -> Union[list[str], None]:
+    def get_build_plate_filaments_by_id(self, build_plate_id: int) -> Union[List[str], None]:
         """
         Get the build plate filaments by the build plate ID
         :param build_plate_id: the build plate ID
