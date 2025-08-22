@@ -10,14 +10,12 @@ def get_filament_types():
     """
 
     return ["PLA",
-            "PLA_plus",
             "PETG",
             "ABS",
             "NYLON",
             "TPU",
             "PC",
             "Wood",
-            "Carbon Fiber",
             "PC_ABS",
             "HIPS",
             "PVA",
