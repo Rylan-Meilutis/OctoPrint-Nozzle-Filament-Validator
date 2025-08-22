@@ -70,19 +70,19 @@ def parse_gcode(file_path: str) -> Dict[str, Any]:
         single_extruder_multi_material = None
         skip_validation = False
         if nozzle_match:
-            nozzle_size = nozzle_match.group(1).replace(" ","").strip().split(',')
+            nozzle_size = nozzle_match.group(1).replace(" ", "").strip().split(',')
         if filament_match:
-            filament_type = filament_match.group(1).replace(" ","").strip().split(';')
+            filament_type = filament_match.group(1).replace(" ", "").strip().split(';')
         if filament_used_match:
-            filament_used = filament_used_match.group(1).replace(" ","").strip().split(',')
+            filament_used = filament_used_match.group(1).replace(" ", "").strip().split(',')
         if printer_model_match:
-            printer_model = printer_model_match.group(1).replace(" ","").strip()
+            printer_model = printer_model_match.group(1).replace(" ", "").strip()
         if skip_validation_match:
             skip_validation = True
         if filament_notes_match:
-            filament_notes = filament_notes_match.group(1).replace(" ","").strip().split(';')
+            filament_notes = filament_notes_match.group(1).replace(" ", "").strip().split(';')
         if single_extruder_multi_material_match:
-            data = single_extruder_multi_material_match.group(1).replace(" ","").strip()
+            data = single_extruder_multi_material_match.group(1).replace(" ", "").strip()
             if data == "1":
                 single_extruder_multi_material = True
             else:
@@ -90,7 +90,8 @@ def parse_gcode(file_path: str) -> Dict[str, Any]:
 
     return {
         "nozzle_size": nozzle_size, "filament_type": filament_type, "filament_used": filament_used,
-        "printer_model": printer_model, "skip_validation": skip_validation, "filament_notes": filament_notes, "single_extruder_multi_material": single_extruder_multi_material}
+        "printer_model": printer_model, "skip_validation": skip_validation, "filament_notes": filament_notes,
+        "single_extruder_multi_material": single_extruder_multi_material}
 
 
 def ends_with_mmu(string: str) -> bool:
