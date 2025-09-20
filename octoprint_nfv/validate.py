@@ -29,6 +29,7 @@ def parse_gcode(file_path: str) -> Dict[str, Any]:
     printer_model_pattern = re.compile(r'; printer_model = (.+)')
     skip_validation_pattern = re.compile(r'; skip_validation(.*)')
     filament_notes_pattern = re.compile(r'; filament_notes = (.+)')
+    single_extruder_multi_material_pattern = re.compile(r'; single_extruder_multi_material = (.+)')
 
     # Number of lines to read from the end of the file
     num_lines = 1000
@@ -60,28 +61,36 @@ def parse_gcode(file_path: str) -> Dict[str, Any]:
         printer_model_match = printer_model_pattern.search(gcode_content)
         skip_validation_match = skip_validation_pattern.search(gcode_content)
         filament_notes_match = filament_notes_pattern.search(gcode_content)
+        single_extruder_multi_material_match = single_extruder_multi_material_pattern.search(gcode_content)
         nozzle_size = None
         filament_type = None
         filament_used = None
         printer_model = None
         filament_notes = None
+        single_extruder_multi_material = None
         skip_validation = False
         if nozzle_match:
-            nozzle_size = nozzle_match.group(1).strip().split(',')
+            nozzle_size = nozzle_match.group(1).replace(" ","").strip().split(',')
         if filament_match:
-            filament_type = filament_match.group(1).strip().split(';')
+            filament_type = filament_match.group(1).replace(" ","").strip().split(';')
         if filament_used_match:
-            filament_used = filament_used_match.group(1).strip().split(',')
+            filament_used = filament_used_match.group(1).replace(" ","").strip().split(',')
         if printer_model_match:
-            printer_model = printer_model_match.group(1).strip()
+            printer_model = printer_model_match.group(1).replace(" ","").strip()
         if skip_validation_match:
             skip_validation = True
         if filament_notes_match:
-            filament_notes = filament_notes_match.group(1).strip().split(';')
+            filament_notes = filament_notes_match.group(1).replace(" ","").strip().split(';')
+        if single_extruder_multi_material_match:
+            data = single_extruder_multi_material_match.group(1).replace(" ","").strip()
+            if data == "1":
+                single_extruder_multi_material = True
+            else:
+                single_extruder_multi_material = False
 
     return {
         "nozzle_size": nozzle_size, "filament_type": filament_type, "filament_used": filament_used,
-        "printer_model": printer_model, "skip_validation": skip_validation, "filament_notes": filament_notes}
+        "printer_model": printer_model, "skip_validation": skip_validation, "filament_notes": filament_notes, "single_extruder_multi_material": single_extruder_multi_material}
 
 
 def ends_with_mmu(string: str) -> bool:
@@ -210,6 +219,10 @@ class validator:
         gcode_info = parse_gcode(file_path)
         printer_model = gcode_info["printer_model"]
         skip_validation = gcode_info["skip_validation"]
+        semm = gcode_info["single_extruder_multi_material"]
+
+        if semm is None:
+            semm = False
 
         if skip_validation:
             return
@@ -249,7 +262,7 @@ class validator:
         if not self.check_num_filaments(loaded_filaments, filament_types, filament_used):
             return
 
-        if not self.check_num_extruders(nozzles):
+        if not self.check_num_extruders(nozzles, semm):
             return
 
         try:
@@ -387,24 +400,26 @@ class validator:
 
         return True
 
-    def check_num_extruders(self, nozzles: List[str]) -> bool:
+    def check_num_extruders(self, nozzles: List[str], semm) -> bool:
         """
         Check the number of extruders in the GCODE
+        :param semm: Single Extruder Multi Material
         :param nozzles: the nozzles from the GCODE
         :return: true if the check passed
         """
         if len(nozzles) > self.extruders.get_number_of_extruders():
             self.send_alert(
-                f"Number of extruders in gcode ({len(nozzles)}) is shorter than the number specified in the "
+                f"Number of extruders in gcode ({len(nozzles)}) is Larger than the number specified in the "
                 f"config ({self.extruders.get_number_of_extruders()})", alert_types.error)
             self._printer.cancel_print()
             return False
         elif len(nozzles) < self.extruders.get_number_of_extruders():
-            self.send_alert(
-                f"Number of extruders in gcode ({len(nozzles)}) is shorter than the number specified in the "
-                f"config ({self.extruders.get_number_of_extruders()}). Press RESUME to continue", alert_types.error)
-            self.pause_print()
-            return False
+            if not semm:
+                self.send_alert(
+                    f"Number of extruders in gcode ({len(nozzles)}) is shorter than the number specified in the "
+                    f"config ({self.extruders.get_number_of_extruders()}). Press RESUME to continue", alert_types.error)
+                self.pause_print()
+                return False
 
         return True
 
