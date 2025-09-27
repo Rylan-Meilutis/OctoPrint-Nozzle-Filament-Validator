@@ -72,11 +72,11 @@ def parse_gcode(file_path: str) -> Dict[str, Any]:
         if nozzle_match:
             nozzle_size = nozzle_match.group(1).replace(" ", "").strip().split(',')
         if filament_match:
-            filament_type = filament_match.group(1).replace(" ", "").strip().split(';')
+            filament_type = filament_match.group(1).strip().split(';')
         if filament_used_match:
             filament_used = filament_used_match.group(1).replace(" ", "").strip().split(',')
         if printer_model_match:
-            printer_model = printer_model_match.group(1).replace(" ", "").strip()
+            printer_model = printer_model_match.group(1).strip()
         if skip_validation_match:
             skip_validation = True
         if filament_notes_match:
