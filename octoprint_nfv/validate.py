@@ -80,7 +80,7 @@ def parse_gcode(file_path: str) -> Dict[str, Any]:
         if skip_validation_match:
             skip_validation = True
         if filament_notes_match:
-            filament_notes = filament_notes_match.group(1).replace(" ", "").strip().split(';')
+            filament_notes = filament_notes_match.group(1).strip().split(';')
         if single_extruder_multi_material_match:
             data = single_extruder_multi_material_match.group(1).replace(" ", "").strip()
             if data == "1":
