@@ -425,8 +425,7 @@ class validator:
         return True
 
     def check_filament_type(self, index: int, loaded_filaments: List[str], filament_types: List[str],
-                            gcode_info: Dict[str, Any], filament_passed: bool, mmu_single_mode: bool) -> (
-            Tuple)[bool, bool]:
+                            gcode_info: Dict[str, Any], filament_passed: bool, mmu_single_mode: bool) -> Tuple[bool, bool]:
         """
         Check the filament type
         :param index: the index of the extruder
