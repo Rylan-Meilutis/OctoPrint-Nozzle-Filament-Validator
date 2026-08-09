@@ -13,7 +13,8 @@ class filament:
         self.data_folder = data_folder
         self._logger = logger
 
-    def initial_db_add(self, enable_spool_checking: bool, timeout: int) -> None:
+    def initial_db_add(self, enable_spool_checking: bool, timeout: int,
+                       enable_filament_type_checking: bool = True) -> None:
         """
         Add the enable spool checking and timeout to the database
         this function is called when the plugin is first initialised and should only be called then
@@ -22,6 +23,29 @@ class filament:
         """
         self.add_enable_spool_checking_to_db(enable_spool_checking)
         self.add_timeout_to_db(timeout)
+        self._add_setting("enable_filament_type_checking", enable_filament_type_checking)
+
+    def _add_setting(self, setting_id: str, value) -> None:
+        con = db.get_db(self.data_folder)
+        cursor = con.cursor()
+        cursor.execute("INSERT OR IGNORE INTO filament_data (id, data) VALUES (?, ?)", (setting_id, value))
+        con.commit()
+        con.close()
+
+    def _update_setting(self, setting_id: str, value) -> None:
+        con = db.get_db(self.data_folder)
+        cursor = con.cursor()
+        cursor.execute("UPDATE filament_data SET data = ? WHERE id = ?", (value, setting_id))
+        con.commit()
+        con.close()
+
+    def _get_bool_setting(self, setting_id: str, default: bool) -> bool:
+        con = db.get_db(self.data_folder)
+        cursor = con.cursor()
+        cursor.execute("SELECT data FROM filament_data WHERE id = ?", (setting_id,))
+        row = cursor.fetchone()
+        con.close()
+        return default if row is None else bool(row[0])
 
     def add_timeout_to_db(self, timeout: int) -> None:
         """
@@ -71,6 +95,9 @@ class filament:
         cursor.execute("UPDATE filament_data SET data = ? WHERE id = 'enable_spool_checking'", (enable_spool_checking,))
         con.commit()
 
+    def update_enable_filament_type_checking(self, enabled: bool) -> None:
+        self._update_setting("enable_filament_type_checking", enabled)
+
     def update_timeout(self, timeout: int) -> None:
         """
         Update the timeout for the filament
@@ -100,3 +127,6 @@ class filament:
         cursor = con.cursor()
         cursor.execute("SELECT data FROM filament_data WHERE id = 'enable_spool_checking'")
         return bool(cursor.fetchone()[0])
+
+    def get_enable_filament_type_checking(self) -> bool:
+        return self._get_bool_setting("enable_filament_type_checking", True)

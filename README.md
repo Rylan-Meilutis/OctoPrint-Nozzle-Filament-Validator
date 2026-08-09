@@ -58,6 +58,25 @@ have set, and that the current filament is supported by the selected build plate
 does not match, it will notify you of the error. If it does match, it will notify you of a
 successful validation.
 
+Validation runs in OctoPrint's GCODE queuing phase. The first command belonging to the
+print job is held until validation succeeds; when validation fails, job commands are
+suppressed and the print is cancelled. This backend gate also applies to prints started
+through OctoPrint's API or another plugin, not only the web UI. Files on the printer's SD
+card cannot be validated because OctoPrint cannot read their contents, so those jobs are
+blocked by the validation gate.
+
+If metadata is missing, unreadable, malformed, or does not match the configured printer,
+the plugin displays a warning with **Continue anyway** and **Cancel print** choices. No
+response before the configured validation timeout is treated as cancellation, so the gate
+remains fail-closed. Pending validation and spool-selection prompts are returned to clients
+that connect or reload during the timeout, with the remaining response time rather than a
+new timeout.
+
+Filament validation has two independent settings: **Validate filament types** compares the
+material type reported by SpoolManager, while **Validate filament/spool names** checks the
+`sm_name` value from filament notes. Either check can be disabled without disabling the
+other nozzle, build-plate, printer-model, or tool-count checks.
+
 ## Multi Extruder Support
 
 When configured in octoprint, this plugin supports multi material printers. It will check filament type on each extruder
@@ -110,8 +129,6 @@ Nothing major at the moment, just bug fixes, removing unused functions, and othe
 -  ** Add the ability to change the spool type in the gcode from the octoprint webui.
 
 
-- Add the ability to scan the gcode before starting a print to verify the settings
-- Add the ability to auto scan new files for compatability when they are uploaded and remove them if they are not
+- Add the ability to auto scan new files for compatibility when they are uploaded and remove them if they are not
   compatible
 - Add the ability to scan all files and remove ones that aren't compatible
-
