@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import absolute_import, annotations
 
+import threading
 from typing import Dict, List
 
 import flask
@@ -40,13 +41,16 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self.extruders: extruders = None
         self.validator: validate = None
         self.filament: filament = None
+        self._validation_lock = threading.RLock()
+        self._validation_result = None
+        self._validation_path = None
 
     def get_api_commands(self):
         """
         Get the API commands for the plugin
         :return: the API commands
         """
-        if current_user.is_anonymous():
+        if current_user.is_anonymous:
             return flask.abort(403)
 
         return dict(
@@ -61,7 +65,12 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             get_loaded_filaments=[],
             updateWaitState=["state"],
             update_filament_timeout=["timeout"],
+            update_check_spool_id_timeout=["timeout"],
             update_check_spool_id=["checkSpoolId"],
+            update_filament_type_checking=["enabled"],
+            add_extruder=["nozzleId", "extruderPosition"],
+            remove_extruder=["extruderId"],
+            set_multiple_tool_heads=["value"],
         )
 
     def on_api_get(self, request: flask.Request) -> flask.Response:
@@ -69,7 +78,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         Handle the API get requests
         :param request: the request to handle
         """
-        if current_user.is_anonymous():
+        if current_user.is_anonymous:
             return flask.abort(403)
 
         nozzles = self.nozzle.fetch_nozzles_from_database()
@@ -81,11 +90,15 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         is_multi_extruder = str(self.extruders.is_multi_tool_head())
         check_ids = str(self.filament.get_enable_spool_checking())
         check_spool_id_timeout = self.filament.get_timeout()
+        check_filament_type = str(self.filament.get_enable_filament_type_checking())
+        active_prompt = self.validator.get_active_prompt()
         return flask.jsonify(nozzles=nozzles, number_of_extruders=number_of_extruders,
                              build_plates=build_plates, currentBuildPlate=current_build_plate,
                              currentBuildPlateFilaments=current_build_plate_filaments, filaments=filaments,
                              isMultiExtruder=is_multi_extruder, check_spool_id=check_ids,
-                             check_spool_id_timeout=check_spool_id_timeout)
+                             check_spool_id_timeout=check_spool_id_timeout,
+                             check_filament_type=check_filament_type,
+                             active_prompt=active_prompt)
 
     def on_api_command(self, command: str, data: Dict) -> flask.response:
         """
@@ -122,12 +135,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         elif command == "add_build_plate":
             name = data["name"]
             compatible_filaments = data["compatibleFilaments"]
-            db_position = data.get("id") if data.get("id") is not None or data.get("id") != "" else None
+            db_position = data.get("id") if data.get("id") not in (None, "") else "null"
             if name is not None and compatible_filaments is not None:
                 try:
                     self.build_plate.insert_build_plate_to_database(name, compatible_filaments, db_position)
                 except Exception as e:
                     self.send_alert(f"Error adding build plate: {e}", alert_types.tmp_error)
+                    return flask.abort(409)
                 return flask.jsonify(success=True)
             else:
                 return flask.abort(400)
@@ -248,17 +262,28 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                 return flask.jsonify(success=True)
             flask.abort(400)
 
-        elif command == "update_filament_timeout":
+        elif command in ("update_filament_timeout", "update_check_spool_id_timeout"):
             data = data.get("timeout")
             if data is not None:
-                self.filament.update_timeout(int(data))
+                timeout = int(data)
+                if timeout < 0:
+                    return flask.abort(400)
+                self.filament.update_timeout(timeout)
                 return flask.jsonify(success=True)
             flask.abort(400)
 
         elif command == "update_check_spool_id":
             data = data.get("checkSpoolId")
             if data is not None:
-                self.filament.update_enable_spool_checking(bool(data))
+                enabled = data if isinstance(data, bool) else str(data).lower() in ("1", "true", "yes", "on")
+                self.filament.update_enable_spool_checking(enabled)
+                return flask.jsonify(success=True)
+            flask.abort(400)
+        elif command == "update_filament_type_checking":
+            value = data.get("enabled")
+            if value is not None:
+                enabled = value if isinstance(value, bool) else str(value).lower() in ("1", "true", "yes", "on")
+                self.filament.update_enable_filament_type_checking(enabled)
                 return flask.jsonify(success=True)
             flask.abort(400)
         return flask.abort(400)
@@ -287,7 +312,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
         conn = get_db(self.get_plugin_data_folder())
 
-        spool_manager_plugin = self._plugin_manager.plugins.get("SpoolManager").implementation
+        spool_manager_info = self._plugin_manager.plugins.get("SpoolManager")
+        spool_manager_plugin = spool_manager_info.implementation if spool_manager_info is not None else None
         self._spool_manager = SpoolManagerIntegration(spool_manager_plugin, self._logger)
 
         self.nozzle = nozzle.nozzle(self.get_plugin_data_folder(), self._logger)
@@ -313,7 +339,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "extruders",
                          self.extruders.add_extruder_to_database, (1, 1))
         db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "filament_data",
-                         self.filament.initial_db_add, (False, 300), 2)
+                         self.filament.initial_db_add, (False, 300, True), 3)
 
         self.extruders.update_data()
         conn.close()
@@ -324,22 +350,80 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         :param event: the event to handle
         :param payload: the payload of the event
         """
-        if event == Events.PRINT_STARTED:
-            with self._printer.job_on_hold(blocking=True):
-                self._logger.info("detected print_start_event")
-                selected_file = payload.get("file", "")
-                if not selected_file:
-                    path = payload.get("path", "")
-                    if payload.get("origin") == "local":
-                        # Get the full path to local file
-                        path = self._file_manager.path_on_disk(FileDestinations.LOCAL, path)
-                    selected_file = path
-
-                self.validator.check_print(selected_file)
+        if event in (Events.PRINT_CANCELLED, Events.PRINT_DONE, Events.PRINT_FAILED):
+            with self._validation_lock:
+                self._validation_result = None
+                self._validation_path = None
 
         if "PrinterProfile" in event or event == Events.CONNECTED:
             self.extruders.update_data()
             self.send_alert("", "reload")
+
+    def _get_selected_file_path(self, comm_instance=None):
+        """Return the selected local job's absolute path, when available."""
+        # During a select-and-print request the state monitor can still contain
+        # the previously selected path. The comm layer is authoritative at the
+        # point where it queues this job's first command.
+        current_file = getattr(comm_instance, "_currentFile", None)
+        is_sd_file_selected = getattr(comm_instance, "isSdFileSelected", None)
+        is_sd_file = bool(is_sd_file_selected and is_sd_file_selected())
+        if is_sd_file:
+            return None
+        if current_file is not None:
+            filename = current_file.getFilename()
+            if filename:
+                return filename
+
+        job = self._printer.get_current_job() or {}
+        file_info = job.get("file") or {}
+        path = file_info.get("path")
+        origin = file_info.get("origin")
+        if path and origin == FileDestinations.LOCAL:
+            return self._file_manager.path_on_disk(FileDestinations.LOCAL, path)
+        return None
+
+    def validate_before_queuing(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+        """Block the first job command until the selected GCODE has passed validation."""
+        tags = kwargs.get("tags") or set()
+        is_print_command = "source:job" in tags or "source:file" in tags
+        is_cancellation_command = bool(
+            {"trigger:cancel", "trigger:comm.cancel"} & tags
+            or "script:afterPrintCancelled" in tags
+        )
+        if not is_print_command or is_cancellation_command:
+            return None
+
+        with self._validation_lock:
+            try:
+                path = self._get_selected_file_path(comm_instance)
+            except Exception:
+                self._logger.exception("Could not resolve the selected GCODE path")
+                path = None
+
+            if path != self._validation_path:
+                self._validation_path = path
+                self._validation_result = None
+
+            if self._validation_result is None:
+                self._logger.info("Validating selected GCODE before its first command is queued")
+                try:
+                    self._validation_result = bool(self.validator.check_print(path))
+                except Exception:
+                    self._logger.exception("Unexpected error during pre-print validation")
+                    self.send_alert("Print blocked: an unexpected validation error occurred.", alert_types.error)
+                    self._validation_result = False
+
+            if not self._validation_result:
+                # OctoPrint ignores cancellation while still in STARTING. The
+                # hook therefore tries again when the first source:file command
+                # arrives, after the state marker has changed it to PRINTING.
+                is_cancelling = getattr(self._printer, "is_cancelling", lambda: False)
+                if not is_cancelling():
+                    self._printer.cancel_print()
+                # A None command suppresses it in OctoPrint's GCODE phase hook.
+                return (None,)
+
+        return None
 
     # ~~ TemplatePlugin mixin
 
@@ -434,5 +518,6 @@ def __plugin_load__() -> None:
 
     global __plugin_hooks__
     __plugin_hooks__ = {
-        "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+        "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
+        "octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.validate_before_queuing,
     }

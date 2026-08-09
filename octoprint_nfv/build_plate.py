@@ -1,4 +1,4 @@
-from typing import NoReturn, Any, Union, Dict, List
+from typing import Any, Union, Dict, List
 
 from octoprint_nfv.db import get_db
 
@@ -56,7 +56,7 @@ class build_plate:
         return [{"id": row[0], "name": row[1], "compatible_filaments": row[2].replace(" ", "").split(",")} for row in
                 cursor.fetchall()]
 
-    def insert_build_plate_to_database(self, name: str, compatible_filaments: str, id: str = "null") -> NoReturn:
+    def insert_build_plate_to_database(self, name: str, compatible_filaments: str, id: str = "null") -> None:
         """
         Insert a build plate into the database
         :param name: name of the build plate
@@ -96,8 +96,9 @@ class build_plate:
                 con.commit()
         except Exception as e:
             self._logger.error(f"Error adding build plate to the database: {e}")
+            raise
 
-    def select_current_build_plate(self, selected_build_plate_id: int) -> NoReturn:
+    def select_current_build_plate(self, selected_build_plate_id: int) -> None:
         """
         Select the current build plate in the current selections db
         :param selected_build_plate_id: the build_plate_id of the selected build plate
@@ -176,7 +177,7 @@ class build_plate:
 
         return data_id[0] if data_id else None
 
-    def remove_build_plate_from_database(self, build_plate_id) -> NoReturn:
+    def remove_build_plate_from_database(self, build_plate_id) -> None:
         """
         Remove a build plate from the database
         :param build_plate_id: the build_plate_id of the build plate to remove
@@ -184,14 +185,18 @@ class build_plate:
         """
         con = get_db(self.data_folder)
         cursor = con.cursor()
+        build_plate_id = int(build_plate_id)
+        current_build_plate_id = self.get_current_build_plate_id()
         cursor.execute("DELETE FROM build_plates WHERE id = ?", (build_plate_id,))
         con.commit()
 
-        # Check if the removed nozzle was the current nozzle
-        current_nozzle_id = self.get_current_build_plate_id()
-        if current_nozzle_id == build_plate_id:
+        # If the selected plate was removed, select the first remaining plate
+        # instead of leaving a dangling selection.
+        if current_build_plate_id == build_plate_id:
+            cursor.execute("SELECT id FROM build_plates ORDER BY id LIMIT 1")
+            replacement = cursor.fetchone()
             cursor.execute("UPDATE current_selections SET selection = ? WHERE id = 'build_plate'",
-                           (1, "nozzle"))  # Assuming there's only one current nozzle
+                           (replacement[0] if replacement else None,))
             con.commit()
 
     def get_build_plate_name_by_id(self, build_plate_id: int) -> Union[str, None]:
