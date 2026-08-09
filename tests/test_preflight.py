@@ -155,6 +155,20 @@ class _SpoolmanPlugin:
         return _SpoolmanConnector()
 
 
+class _RmeCompatibilityPlugin:
+    def _filament_report(self):
+        return {
+            "schema": "rme-filament-report-v1",
+            "provider": "internal",
+            "data": {"tools": [
+                {"name": "Orange PLA", "material": "PLA", "spool_id": "4",
+                 "provider": "internal"},
+                {"name": "PETG", "material": "PETG", "spool_id": "",
+                 "provider": "RME firmware"},
+            ], "spools": []},
+        }
+
+
 class PreflightGateTests(unittest.TestCase):
     def make_plugin(self, validation_result):
         plugin = Nozzle_filament_validatorPlugin()
@@ -314,6 +328,36 @@ class PreflightGateTests(unittest.TestCase):
         self.assertTrue(integration.is_available())
         self.assertEqual("spoolman", integration.get_source_name())
         self.assertEqual(["PLA", "PETG"], integration.get_loaded_filaments())
+        self.assertEqual(["spoolman:42", "spoolman:84"], integration.get_names())
+
+    def test_rme_compatibility_is_used_after_other_external_providers(self):
+        integration = SpoolManagerIntegration(
+            None, logging.getLogger("nfv-rme-tests"),
+            fallback_filaments=lambda: ["ABS", "ABS"],
+            rme_compatibility_impl=_RmeCompatibilityPlugin())
+
+        self.assertTrue(integration.is_available())
+        self.assertEqual("rme_compatibility", integration.get_source_name())
+        self.assertEqual(["PLA", "PETG"], integration.get_loaded_filaments())
+        self.assertEqual(["rme:internal:4", None], integration.get_names())
+
+    def test_old_rme_plugin_without_report_keeps_manual_fallback_available(self):
+        integration = SpoolManagerIntegration(
+            None, logging.getLogger("nfv-old-rme-tests"),
+            fallback_filaments=lambda: ["ABS"],
+            rme_compatibility_impl=object())
+
+        self.assertFalse(integration.is_available())
+        self.assertEqual("manual", integration.get_source_name())
+        self.assertEqual(["ABS"], integration.get_loaded_filaments())
+
+    def test_spoolman_takes_priority_over_rme_compatibility(self):
+        integration = SpoolManagerIntegration(
+            None, logging.getLogger("nfv-provider-priority-tests"),
+            spoolman_impl=_SpoolmanPlugin(),
+            rme_compatibility_impl=_RmeCompatibilityPlugin())
+
+        self.assertEqual("spoolman", integration.get_source_name())
         self.assertEqual(["spoolman:42", "spoolman:84"], integration.get_names())
 
 

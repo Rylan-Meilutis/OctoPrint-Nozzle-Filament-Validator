@@ -112,6 +112,7 @@ function createExtruderTabs(extrudersArray, response) {
                 <strong>No supported spool plugin is installed.</strong> Install
                 <a href="https://plugins.octoprint.org/plugins/SpoolManager/" target="_blank" rel="noopener">SpoolManager</a>
                 or <a href="https://plugins.octoprint.org/plugins/Spoolman/" target="_blank" rel="noopener">Spoolman</a>
+                or RME Compatibility
                 to validate filament/spool names. You can select the loaded material for each extruder below so
                 filament-type validation still works without it.
             </div>`}
@@ -120,6 +121,12 @@ function createExtruderTabs(extrudersArray, response) {
                 <strong>Using Spoolman.</strong> Selected spool materials are used for filament-type validation.
                 For optional spool-name validation, use the identifier shown for each extruder, such as
                 <code>[sm_name = spoolman:123]</code>, in the slicer's filament notes.
+            </div>` : ''}
+            ${response.filament_source === 'rme_compatibility' ? `
+            <div class="alert alert-info">
+                <strong>Using RME Compatibility.</strong> Its per-tool filament report supplies loaded materials.
+                Inventory-backed tools also expose an identifier such as
+                <code>[sm_name = rme:internal:4]</code>; firmware-only loadouts do not have a unique spool identity.
             </div>` : ''}
             <!-- Checkbox to set check_spool_id -->
             <div class="form-group">
@@ -160,7 +167,8 @@ function createExtruderTabs(extrudersArray, response) {
         let extruderNozzleSize = extruder.nozzleSize || "Nozzle size not available";
         let extruderFilamentType = extruder.filamentType || "Filament type not available";
         let extruderFilamentName = extruder.spoolName || "Filament DB ID not available";
-        let spoolNameLabel = response.filament_source === "spoolman" ? "Spoolman Identifier" : "Spool Name";
+        let spoolNameLabel = response.filament_source === "spoolman" ? "Spoolman Identifier" :
+            (response.filament_source === "rme_compatibility" ? "RME Spool Identifier" : "Spool Name");
         let check_spool_id = response.check_spool_id === "True";
         let manualFilamentSelector = "";
         if (!response.spool_manager_available) {

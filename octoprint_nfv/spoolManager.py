@@ -13,7 +13,7 @@ class SpoolManagerException(Exception):
 
 class SpoolManagerIntegration:
     def __init__(self, impl: Any, logger: logging.Logger, fallback_filaments=None,
-                 spoolman_impl: Any = None) -> None:
+                 spoolman_impl: Any = None, rme_compatibility_impl: Any = None) -> None:
         """
         Constructor
         :param impl: implementation of the Spool Manager
@@ -23,20 +23,57 @@ class SpoolManagerIntegration:
         self._impl = impl
         self._fallback_filaments = fallback_filaments
         self._spoolman_impl = spoolman_impl
+        self._rme_compatibility_impl = rme_compatibility_impl
         self._spoolman_cache = None
         self._spoolman_cache_key = None
         self._spoolman_cache_time = 0.0
         self._spoolman_cache_lock = threading.Lock()
 
     def is_available(self) -> bool:
-        return self._impl is not None or self._spoolman_impl is not None
+        return (self._impl is not None or self._spoolman_impl is not None
+                or self._has_rme_provider())
+
+    def _has_rme_provider(self) -> bool:
+        return callable(getattr(self._rme_compatibility_impl, "_filament_report", None))
 
     def get_source_name(self) -> str:
         if self._impl is not None:
             return "spoolmanager"
         if self._spoolman_impl is not None:
             return "spoolman"
+        if self._has_rme_provider():
+            return "rme_compatibility"
         return "manual"
+
+    def _get_rme_tools(self) -> List[Dict[str, Any]]:
+        """Return RME Compatibility's provider-neutral per-tool loadout."""
+        if self._rme_compatibility_impl is None:
+            return []
+        try:
+            reporter = getattr(self._rme_compatibility_impl, "_filament_report", None)
+            if not callable(reporter):
+                self._logger.warning(
+                    "Installed RME Compatibility plugin does not expose filament-report metadata.")
+                return []
+            report = reporter()
+            if not isinstance(report, dict) or report.get("schema") != "rme-filament-report-v1":
+                self._logger.warning("RME Compatibility returned an unsupported filament report.")
+                return []
+            tools = report.get("data", {}).get("tools", [])
+            return [tool if isinstance(tool, dict) else {} for tool in tools]
+        except Exception as error:
+            self._logger.warning(
+                "Skipping RME Compatibility assignment due to integration error: %s", error)
+            return []
+
+    @staticmethod
+    def _rme_spool_identifier(tool: Dict[str, Any]) -> Union[str, None]:
+        """Build a stable name-validation value for an inventory-backed RME tool."""
+        spool_id = tool.get("spool_id")
+        if spool_id in (None, ""):
+            return None
+        provider = str(tool.get("provider") or "internal").strip().lower().replace(" ", "-")
+        return f"rme:{provider}:{spool_id}"
 
     def _get_spoolman_selected_spools(self) -> List[Union[Dict[str, Any], None]]:
         """Return Spoolman's selected spool object for each zero-based tool."""
@@ -151,6 +188,8 @@ class SpoolManagerIntegration:
                         (spool.get("filament") or {}).get("material") if spool else None
                         for spool in self._get_spoolman_selected_spools()
                     ]
+                if self._has_rme_provider():
+                    return [tool.get("material") or None for tool in self._get_rme_tools()]
                 if self._fallback_filaments is None:
                     self._logger.warning(
                         "Spool Manager is not installed and no manual filament provider is configured.")
@@ -192,6 +231,8 @@ class SpoolManagerIntegration:
                         f"spoolman:{spool['id']}" if spool and spool.get("id") is not None else None
                         for spool in self._get_spoolman_selected_spools()
                     ]
+                if self._has_rme_provider():
+                    return [self._rme_spool_identifier(tool) for tool in self._get_rme_tools()]
                 return []
             spool_names = self._impl.api_getSelectedSpoolInformations()
             spool_names = [

@@ -49,13 +49,18 @@ Go to plugin settings and set your nozzle size for each extruder (or extruder 1 
 and build plate.
 
 Filament type is set automatically when SpoolManager or the OctoPrint Spoolman plugin is installed
-and its selected spools have materials configured. Without either plugin, select the loaded material
+and its selected spools have materials configured. When neither is available, RME Compatibility's
+provider-neutral filament report is used. Without any of these plugins, select the loaded material
 for each extruder on the plugin settings page. These manual selections allow filament-type validation
-to continue, but filament/spool-name validation requires SpoolManager or Spoolman.
+to continue, but filament/spool-name validation requires an external provider.
 
 For Spoolman, the unique `spoolman:<id>` identifier shown on each extruder tab is used for optional
 spool-name validation. Add it to the slicer's filament notes in the same format, for example
 `[sm_name = spoolman:123]`.
+
+RME Compatibility inventory selections use `rme:<provider>:<id>` identifiers, for example
+`[sm_name = rme:internal:4]`. Firmware-only RME loadouts provide material metadata but no unique
+spool identity. Provider priority is SpoolManager, Spoolman, RME Compatibility, then manual selection.
 
 If using a plugin that runs a .gcode file such as the continuous print queue plugin, You can skip gcode validation for
 that file by adding

@@ -294,7 +294,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             if data is not None:
                 enabled = data if isinstance(data, bool) else str(data).lower() in ("1", "true", "yes", "on")
                 if enabled and not self._spool_manager.is_available():
-                    self.send_alert("Install SpoolManager or Spoolman to validate filament/spool names.",
+                    self.send_alert("Install SpoolManager, Spoolman, or RME Compatibility to validate "
+                                    "filament/spool names.",
                                     alert_types.error)
                     return flask.abort(409)
                 self.filament.update_enable_spool_checking(enabled)
@@ -381,10 +382,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         spool_manager_plugin = spool_manager_info.implementation if spool_manager_info is not None else None
         spoolman_info = self._plugin_manager.plugins.get("Spoolman")
         spoolman_plugin = spoolman_info.implementation if spoolman_info is not None else None
+        rme_info = self._plugin_manager.plugins.get("rme_compatibility")
+        rme_plugin = rme_info.implementation if rme_info is not None else None
         self._spool_manager = SpoolManagerIntegration(
             spool_manager_plugin, self._logger,
             lambda: self.filament.get_manual_filaments(self.extruders.get_number_of_extruders()),
-            spoolman_impl=spoolman_plugin)
+            spoolman_impl=spoolman_plugin,
+            rme_compatibility_impl=rme_plugin)
 
         self.validator = validate.validator(self.nozzle, self.build_plate, self.extruders, self._spool_manager,
                                             self.filament,

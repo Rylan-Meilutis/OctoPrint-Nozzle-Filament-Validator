@@ -1,4 +1,4 @@
-# Nozzle Filament Validator 3.3.0b1
+# Nozzle Filament Validator 3.3.0b2
 
 ## Early file validation
 
@@ -27,3 +27,6 @@
 - Added first-class support for the OctoPrint Spoolman plugin. Selected Spoolman materials feed
   filament-type validation, while the unique `spoolman:<id>` value supports optional spool-name
   validation. If both integrations are installed, SpoolManager remains the preferred source.
+- Added RME Compatibility as a fallback metadata provider when neither SpoolManager nor Spoolman is
+  available. Its `rme-filament-report-v1` per-tool loadout supplies filament materials, and
+  inventory-backed spools expose stable `rme:<provider>:<id>` identifiers for name validation.

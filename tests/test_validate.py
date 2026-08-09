@@ -98,6 +98,14 @@ class _SpoolmanProvider(_ManualFilamentProvider):
         return ["spoolman:42"]
 
 
+class _RmeProvider(_ManualFilamentProvider):
+    def is_available(self):
+        return True
+
+    def get_names(self):
+        return ["rme:internal:4"]
+
+
 class _NameCheckingFilament(_Filament):
     def get_enable_spool_checking(self):
         return True
@@ -200,6 +208,14 @@ class ValidatorTests(unittest.TestCase):
         self.validator._spool_manager = _SpoolmanProvider("PLA")
         with_identifier = VALID_GCODE.replace(
             "G28\n", "; filament_notes = [sm_name = spoolman:42]\nG28\n")
+
+        self.assertTrue(self.validator.check_print(self.write_gcode(with_identifier)))
+
+    def test_rme_identifier_supports_spool_name_validation(self):
+        self.validator._filament = _NameCheckingFilament()
+        self.validator._spool_manager = _RmeProvider("PLA")
+        with_identifier = VALID_GCODE.replace(
+            "G28\n", "; filament_notes = [sm_name = rme:internal:4]\nG28\n")
 
         self.assertTrue(self.validator.check_print(self.write_gcode(with_identifier)))
 
