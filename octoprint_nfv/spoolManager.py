@@ -1,5 +1,7 @@
 import json
 import logging
+import threading
+import time
 from typing import Any, List, Dict, Union
 
 from octoprint.server import app
@@ -10,7 +12,8 @@ class SpoolManagerException(Exception):
 
 
 class SpoolManagerIntegration:
-    def __init__(self, impl: Any, logger: logging.Logger) -> None:
+    def __init__(self, impl: Any, logger: logging.Logger, fallback_filaments=None,
+                 spoolman_impl: Any = None) -> None:
         """
         Constructor
         :param impl: implementation of the Spool Manager
@@ -18,6 +21,58 @@ class SpoolManagerIntegration:
         """
         self._logger = logger
         self._impl = impl
+        self._fallback_filaments = fallback_filaments
+        self._spoolman_impl = spoolman_impl
+        self._spoolman_cache = None
+        self._spoolman_cache_key = None
+        self._spoolman_cache_time = 0.0
+        self._spoolman_cache_lock = threading.Lock()
+
+    def is_available(self) -> bool:
+        return self._impl is not None or self._spoolman_impl is not None
+
+    def get_source_name(self) -> str:
+        if self._impl is not None:
+            return "spoolmanager"
+        if self._spoolman_impl is not None:
+            return "spoolman"
+        return "manual"
+
+    def _get_spoolman_selected_spools(self) -> List[Union[Dict[str, Any], None]]:
+        """Return Spoolman's selected spool object for each zero-based tool."""
+        if self._spoolman_impl is None:
+            return []
+        try:
+            selections = self._spoolman_impl._settings.get(["selectedSpoolIds"]) or {}
+            normalized = {
+                int(tool): str(data.get("spoolId"))
+                for tool, data in selections.items()
+                if data and data.get("spoolId") not in (None, "")
+            }
+            cache_key = tuple(sorted(normalized.items()))
+            with self._spoolman_cache_lock:
+                now = time.monotonic()
+                if (self._spoolman_cache is not None and self._spoolman_cache_key == cache_key
+                        and now - self._spoolman_cache_time < 1.0):
+                    return list(self._spoolman_cache)
+
+                result = self._spoolman_impl.getSpoolmanConnector().handleGetSpoolsAvailable()
+                if result.get("error"):
+                    self._logger.warning("Could not retrieve selected Spoolman spools: %s", result["error"])
+                    return []
+                available = result.get("data", {}).get("spools", [])
+                by_id = {str(spool.get("id")): spool for spool in available if spool.get("id") is not None}
+                selected = [None] * (max(normalized.keys()) + 1 if normalized else 0)
+                for tool, spool_id in normalized.items():
+                    selected[tool] = by_id.get(spool_id)
+
+                self._spoolman_cache = list(selected)
+                self._spoolman_cache_key = cache_key
+                self._spoolman_cache_time = now
+                return selected
+        except Exception as error:
+            self._logger.warning("Skipping Spoolman assignment due to integration error: %s", error)
+            return []
 
     def get_materials(self) -> List[str]:
         """
@@ -91,8 +146,16 @@ class SpoolManagerIntegration:
         """
         try:
             if self._impl is None:
-                self._logger.warning("Spool Manager plugin is not installed. Filament alert_type will not be checked.")
-                return -1
+                if self._spoolman_impl is not None:
+                    return [
+                        (spool.get("filament") or {}).get("material") if spool else None
+                        for spool in self._get_spoolman_selected_spools()
+                    ]
+                if self._fallback_filaments is None:
+                    self._logger.warning(
+                        "Spool Manager is not installed and no manual filament provider is configured.")
+                    return -1
+                return self._fallback_filaments()
 
             materials = self.get_materials()
 
@@ -124,6 +187,11 @@ class SpoolManagerIntegration:
         """
         try:
             if self._impl is None:
+                if self._spoolman_impl is not None:
+                    return [
+                        f"spoolman:{spool['id']}" if spool and spool.get("id") is not None else None
+                        for spool in self._get_spoolman_selected_spools()
+                    ]
                 return []
             spool_names = self._impl.api_getSelectedSpoolInformations()
             spool_names = [

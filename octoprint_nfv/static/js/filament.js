@@ -21,6 +21,14 @@ function setRefreshButtons() {
     $('#check-spool-id-timeout-input').change(function () {
         update_check_spool_id_timeout(this.value);
     });
+    $('#extruder-tabs').off('click', '.save-manual-filament');
+    $('#extruder-tabs').on('click', '.save-manual-filament', function () {
+        let extruderPosition = Number($(this).data('extruder-position'));
+        let filamentType = $(`#manual-filament-${extruderPosition}`).val();
+        if (filamentType) {
+            update_manual_filament(extruderPosition, filamentType);
+        }
+    });
 }
 
 /**
@@ -46,6 +54,15 @@ function update_filament_type_checking(isChecked) {
 function update_validate_on_upload(isChecked) {
     OctoPrint.simpleApiCommand(PLUGIN_ID, "update_validate_on_upload", {
         "enabled": isChecked
+    }).done(function () {
+        displayData();
+    });
+}
+
+function update_manual_filament(extruderPosition, filamentType) {
+    OctoPrint.simpleApiCommand(PLUGIN_ID, "update_manual_filament", {
+        "extruderPosition": extruderPosition,
+        "filamentType": filamentType
     }).done(function () {
         displayData();
     });

@@ -1,4 +1,4 @@
-# Nozzle Filament Validator 3.3.0dev1
+# Nozzle Filament Validator 3.3.0b1
 
 ## Early file validation
 
@@ -14,3 +14,16 @@
   validation request.
 - Upload and on-demand validation run in a background worker so validation prompts do not block
   OctoPrint's upload or plugin API request handling.
+
+## Operation without SpoolManager
+
+- Fixed the remaining issue #17 failure where the extruder-info API indexed an empty spool-name
+  list and left the plugin settings page blank when SpoolManager was not installed.
+- Added persistent per-extruder loaded-material selectors when SpoolManager is unavailable, so
+  filament-type validation can still run.
+- Added an installation notice and disabled filament/spool-name validation when neither supported
+  spool plugin is available. Manual material selections intentionally do not stand in for unique
+  spool names.
+- Added first-class support for the OctoPrint Spoolman plugin. Selected Spoolman materials feed
+  filament-type validation, while the unique `spoolman:<id>` value supports optional spool-name
+  validation. If both integrations are installed, SpoolManager remains the preferred source.

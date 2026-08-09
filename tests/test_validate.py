@@ -76,6 +76,33 @@ class _WrongTypeSpoolManager:
         return ["ABS"]
 
 
+class _ManualFilamentProvider:
+    def __init__(self, material):
+        self.material = material
+
+    def is_available(self):
+        return False
+
+    def get_loaded_filaments(self):
+        return [self.material]
+
+    def get_names(self):
+        return []
+
+
+class _SpoolmanProvider(_ManualFilamentProvider):
+    def is_available(self):
+        return True
+
+    def get_names(self):
+        return ["spoolman:42"]
+
+
+class _NameCheckingFilament(_Filament):
+    def get_enable_spool_checking(self):
+        return True
+
+
 class _Printer:
     def __init__(self):
         self.cancelled = False
@@ -159,6 +186,22 @@ class ValidatorTests(unittest.TestCase):
         self.validator._filament = _TypesDisabledFilament()
         self.validator._spool_manager = _WrongTypeSpoolManager()
         self.assertTrue(self.validator.check_print(self.write_gcode(VALID_GCODE)))
+
+    def test_manual_filament_is_validated_without_spool_name_checking(self):
+        self.validator._filament = _NameCheckingFilament()
+        self.validator._spool_manager = _ManualFilamentProvider("PLA")
+        self.assertTrue(self.validator.check_print(self.write_gcode(VALID_GCODE)))
+
+        self.validator._spool_manager = _ManualFilamentProvider("ABS")
+        self.assertFalse(self.validator.check_print(self.write_gcode(VALID_GCODE)))
+
+    def test_spoolman_identifier_supports_spool_name_validation(self):
+        self.validator._filament = _NameCheckingFilament()
+        self.validator._spool_manager = _SpoolmanProvider("PLA")
+        with_identifier = VALID_GCODE.replace(
+            "G28\n", "; filament_notes = [sm_name = spoolman:42]\nG28\n")
+
+        self.assertTrue(self.validator.check_print(self.write_gcode(with_identifier)))
 
     def test_active_prompt_can_be_replayed_then_cleared(self):
         self.validator.set_active_prompt("validation_prompt", "Still waiting", 10)

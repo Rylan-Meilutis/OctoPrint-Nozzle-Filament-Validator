@@ -51,6 +51,9 @@ def _install_octoprint_stubs():
 _install_octoprint_stubs()
 
 from octoprint_nfv import Nozzle_filament_validatorPlugin
+from octoprint_nfv.db import init_db
+from octoprint_nfv.filament import filament
+from octoprint_nfv.spoolManager import SpoolManagerIntegration
 
 
 class _CurrentFile:
@@ -121,6 +124,35 @@ class _Settings:
 
     def get_boolean(self, path):
         return self.validate_on_upload
+
+
+class _FallbackExtruders:
+    def get_nozzle_size_for_extruder(self, position):
+        return 0.4
+
+    def get_number_of_extruders(self):
+        return 2
+
+
+class _SpoolmanSettings:
+    def get(self, path):
+        return {"0": {"spoolId": "42"}, "1": {"spoolId": "84"}}
+
+
+class _SpoolmanConnector:
+    def handleGetSpoolsAvailable(self):
+        return {"data": {"spools": [
+            {"id": 42, "filament": {"material": "PLA", "name": "Galaxy PLA"}},
+            {"id": 84, "filament": {"material": "PETG", "name": "Tough PETG"}},
+        ]}}
+
+
+class _SpoolmanPlugin:
+    def __init__(self):
+        self._settings = _SpoolmanSettings()
+
+    def getSpoolmanConnector(self):
+        return _SpoolmanConnector()
 
 
 class PreflightGateTests(unittest.TestCase):
@@ -246,6 +278,43 @@ class PreflightGateTests(unittest.TestCase):
         plugin.on_event("Upload", {"target": "sdcard", "path": "other.gcode"})
 
         self.assertEqual([("part.gcode", "part.gcode", "upload")], requests)
+
+    def test_missing_spool_manager_uses_persisted_manual_filaments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            init_db(directory)
+            fallback = filament(directory, logging.getLogger("nfv-fallback-tests"))
+            fallback.update_manual_filament(1, "PLA")
+            fallback.update_manual_filament(2, "PETG")
+            integration = SpoolManagerIntegration(
+                None, logging.getLogger("nfv-fallback-tests"),
+                lambda: fallback.get_manual_filaments(2))
+
+            self.assertFalse(integration.is_available())
+            self.assertEqual("manual", integration.get_source_name())
+            self.assertEqual(["PLA", "PETG"], integration.get_loaded_filaments())
+            self.assertEqual([], integration.get_names())
+
+    def test_extruder_info_does_not_index_missing_spool_names(self):
+        plugin = self.make_plugin(True)
+        plugin.extruders = _FallbackExtruders()
+        plugin._spool_manager = SpoolManagerIntegration(
+            None, logging.getLogger("nfv-fallback-tests"), lambda: ["PLA", "PETG"])
+
+        response = plugin.on_api_command("get_extruder_info", {"extruderId": 1})
+
+        self.assertEqual("PLA", response["filamentType"])
+        self.assertIsNone(response["spoolName"])
+
+    def test_spoolman_selected_spools_supply_materials_and_unique_names(self):
+        integration = SpoolManagerIntegration(
+            None, logging.getLogger("nfv-spoolman-tests"),
+            fallback_filaments=lambda: ["ABS", "ABS"],
+            spoolman_impl=_SpoolmanPlugin())
+
+        self.assertTrue(integration.is_available())
+        self.assertEqual("spoolman", integration.get_source_name())
+        self.assertEqual(["PLA", "PETG"], integration.get_loaded_filaments())
+        self.assertEqual(["spoolman:42", "spoolman:84"], integration.get_names())
 
 
 if __name__ == "__main__":

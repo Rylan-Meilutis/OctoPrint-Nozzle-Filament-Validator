@@ -76,6 +76,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             update_filament_type_checking=["enabled"],
             update_validate_on_upload=["enabled"],
             validate_file=["path", "origin"],
+            update_manual_filament=["extruderPosition", "filamentType"],
             add_extruder=["nozzleId", "extruderPosition"],
             remove_extruder=["extruderId"],
             set_multiple_tool_heads=["value"],
@@ -99,6 +100,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         check_ids = str(self.filament.get_enable_spool_checking())
         check_spool_id_timeout = self.filament.get_timeout()
         check_filament_type = str(self.filament.get_enable_filament_type_checking())
+        spool_manager_available = self._spool_manager.is_available()
+        filament_source = self._spool_manager.get_source_name()
         active_prompt = self.validator.get_active_prompt()
         validate_on_upload = self._settings.get_boolean(["validate_on_upload"])
         return flask.jsonify(nozzles=nozzles, number_of_extruders=number_of_extruders,
@@ -107,6 +110,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                              isMultiExtruder=is_multi_extruder, check_spool_id=check_ids,
                              check_spool_id_timeout=check_spool_id_timeout,
                              check_filament_type=check_filament_type,
+                             spool_manager_available=spool_manager_available,
+                             filament_source=filament_source,
                              validate_on_upload=validate_on_upload,
                              active_prompt=active_prompt)
 
@@ -239,9 +244,11 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                     except Exception as e:
                         self._logger.error(f"Error retrieving filament info: {e}")
                         filaments = None
+                    spool_names = self._spool_manager.get_names() or []
+                    spool_name = spool_names[extruder_position - 1] if extruder_position <= len(spool_names) else None
                     return flask.jsonify(nozzleSize=nozzle_size, extruderPosition=extruder_position,
                                          filamentType=filaments,
-                                         spoolName=self._spool_manager.get_names()[extruder_position - 1])
+                                         spoolName=spool_name)
                 except Exception as e:
                     self.send_alert(f"Error retrieving extruder info: {e}", alert_types.tmp_error)
                     return flask.abort(500)
@@ -286,6 +293,10 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             data = data.get("checkSpoolId")
             if data is not None:
                 enabled = data if isinstance(data, bool) else str(data).lower() in ("1", "true", "yes", "on")
+                if enabled and not self._spool_manager.is_available():
+                    self.send_alert("Install SpoolManager or Spoolman to validate filament/spool names.",
+                                    alert_types.error)
+                    return flask.abort(409)
                 self.filament.update_enable_spool_checking(enabled)
                 return flask.jsonify(success=True)
             flask.abort(400)
@@ -318,6 +329,22 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                 return flask.abort(404)
             started = self._start_file_validation(disk_path, path, "manual")
             return flask.jsonify(success=True, started=started)
+        elif command == "update_manual_filament":
+            if self._spool_manager.is_available():
+                return flask.abort(409)
+            extruder_position = data.get("extruderPosition")
+            filament_type = data.get("filamentType")
+            if extruder_position is None or filament_type not in build_plate.get_filament_types():
+                return flask.abort(400)
+            try:
+                extruder_position = int(extruder_position)
+            except (TypeError, ValueError):
+                return flask.abort(400)
+            if extruder_position < 1 or extruder_position > self.extruders.get_number_of_extruders():
+                return flask.abort(400)
+            self.filament.update_manual_filament(extruder_position, filament_type)
+            self.send_alert(f"Extruder {extruder_position} filament set to {filament_type}.", alert_types.success)
+            return flask.jsonify(success=True)
         return flask.abort(400)
 
     def send_alert(self, message: str, alert_type: str = alert_types.popup) -> None:
@@ -344,15 +371,20 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
         conn = get_db(self.get_plugin_data_folder())
 
-        spool_manager_info = self._plugin_manager.plugins.get("SpoolManager")
-        spool_manager_plugin = spool_manager_info.implementation if spool_manager_info is not None else None
-        self._spool_manager = SpoolManagerIntegration(spool_manager_plugin, self._logger)
-
         self.nozzle = nozzle.nozzle(self.get_plugin_data_folder(), self._logger)
         self.build_plate = build_plate.build_plate(self.get_plugin_data_folder(), self._logger)
         self.extruders = extruders.extruders(self.nozzle, self.get_plugin_data_folder(), self._logger,
                                              self._printer_profile_manager)
         self.filament = filament(self.get_plugin_data_folder(), self._logger)
+
+        spool_manager_info = self._plugin_manager.plugins.get("SpoolManager")
+        spool_manager_plugin = spool_manager_info.implementation if spool_manager_info is not None else None
+        spoolman_info = self._plugin_manager.plugins.get("Spoolman")
+        spoolman_plugin = spoolman_info.implementation if spoolman_info is not None else None
+        self._spool_manager = SpoolManagerIntegration(
+            spool_manager_plugin, self._logger,
+            lambda: self.filament.get_manual_filaments(self.extruders.get_number_of_extruders()),
+            spoolman_impl=spoolman_plugin)
 
         self.validator = validate.validator(self.nozzle, self.build_plate, self.extruders, self._spool_manager,
                                             self.filament,

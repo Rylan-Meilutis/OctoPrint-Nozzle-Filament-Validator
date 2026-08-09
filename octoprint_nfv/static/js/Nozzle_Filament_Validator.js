@@ -107,9 +107,25 @@ function createExtruderTabs(extrudersArray, response) {
             </div>
             
             <hr>
+            ${response.spool_manager_available ? '' : `
+            <div class="alert alert-info">
+                <strong>No supported spool plugin is installed.</strong> Install
+                <a href="https://plugins.octoprint.org/plugins/SpoolManager/" target="_blank" rel="noopener">SpoolManager</a>
+                or <a href="https://plugins.octoprint.org/plugins/Spoolman/" target="_blank" rel="noopener">Spoolman</a>
+                to validate filament/spool names. You can select the loaded material for each extruder below so
+                filament-type validation still works without it.
+            </div>`}
+            ${response.filament_source === 'spoolman' ? `
+            <div class="alert alert-info">
+                <strong>Using Spoolman.</strong> Selected spool materials are used for filament-type validation.
+                For optional spool-name validation, use the identifier shown for each extruder, such as
+                <code>[sm_name = spoolman:123]</code>, in the slicer's filament notes.
+            </div>` : ''}
             <!-- Checkbox to set check_spool_id -->
             <div class="form-group">
-                <input type="checkbox" id="check-spool-id-checkbox" ${response.check_spool_id === "True" ? 'checked' : ''}>
+                <input type="checkbox" id="check-spool-id-checkbox"
+                    ${response.check_spool_id === "True" && response.spool_manager_available ? 'checked' : ''}
+                    ${response.spool_manager_available ? '' : 'disabled'}>
                 <label for="check-spool-id-checkbox">Validate filament/spool names</label>
             </div>
             <div class="form-group">
@@ -144,7 +160,26 @@ function createExtruderTabs(extrudersArray, response) {
         let extruderNozzleSize = extruder.nozzleSize || "Nozzle size not available";
         let extruderFilamentType = extruder.filamentType || "Filament type not available";
         let extruderFilamentName = extruder.spoolName || "Filament DB ID not available";
+        let spoolNameLabel = response.filament_source === "spoolman" ? "Spoolman Identifier" : "Spool Name";
         let check_spool_id = response.check_spool_id === "True";
+        let manualFilamentSelector = "";
+        if (!response.spool_manager_available) {
+            let options = (response.filaments || []).map(function (filamentType) {
+                let selected = filamentType === extruderFilamentType ? " selected" : "";
+                return `<option value="${filamentType}"${selected}>${filamentType}</option>`;
+            }).join("");
+            manualFilamentSelector = `
+                <hr>
+                <label for="manual-filament-${extruderPosition}">Loaded filament on extruder ${extruderPosition}
+                    (${extruderNozzleSize} mm nozzle):</label>
+                <select id="manual-filament-${extruderPosition}" class="form-control manual-filament-select"
+                        data-extruder-position="${extruderPosition}">
+                    <option value="">Select a filament</option>
+                    ${options}
+                </select>
+                <button class="btn btn-success save-manual-filament"
+                        data-extruder-position="${extruderPosition}">Set Loaded Filament</button>`;
+        }
 
         $('#myTabs').append(`
             <li class="nav-item" id="#extruder-${extruderPosition}">
@@ -157,7 +192,7 @@ function createExtruderTabs(extrudersArray, response) {
             <div class="tab-pane" id="extruder-${extruderPosition}">
                 <div>
                     <strong>Filament Type: </strong><span>${extruderFilamentType}</span><br>
-                    <strong>Spool Name: </strong><span>"${extruderFilamentName}"</span>&nbsp;&nbsp;
+                    <strong>${spoolNameLabel}: </strong><span>"${extruderFilamentName}"</span>&nbsp;&nbsp;
                     <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
                     ${check_spool_id && extruderFilamentName !== "Filament DB ID not available" ? '<p>To setup this spool in your slicer, you need to add the following line into ' +
             'the notes setting of your filament <code>[sm_name = ' + extruderFilamentName + ']</code><br>(Note: you cannot have brackets [] in the name of your filament.)</p>' : ''}
@@ -168,6 +203,7 @@ function createExtruderTabs(extrudersArray, response) {
                     <select id="nozzle-dropdown-${extruderPosition}" class="form-control" ${nozzleDropdownDisabled}>
                     </select>
                     <button id="select-nozzle-button-${extruderPosition}" class="btn btn-success">Select Nozzle</button>
+                    ${manualFilamentSelector}
                 </div>
             </div>
         `);

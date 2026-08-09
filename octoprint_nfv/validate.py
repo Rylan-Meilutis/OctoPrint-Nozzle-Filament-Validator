@@ -650,7 +650,8 @@ class validator:
         :return: true if the check passed
         """
 
-        if not self._filament.get_enable_spool_checking():
+        if (not self._filament.get_enable_spool_checking()
+                or not getattr(self._spool_manager, "is_available", lambda: True)()):
             return True, True
 
         timeout = self._filament.get_timeout()

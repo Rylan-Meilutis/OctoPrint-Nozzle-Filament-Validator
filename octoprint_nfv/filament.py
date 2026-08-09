@@ -1,4 +1,5 @@
 import logging
+from typing import List, Optional
 
 from octoprint_nfv import db
 
@@ -130,3 +131,24 @@ class filament:
 
     def get_enable_filament_type_checking(self) -> bool:
         return self._get_bool_setting("enable_filament_type_checking", True)
+
+    def update_manual_filament(self, extruder_position: int, filament_type: str) -> None:
+        """Persist the selected material for an extruder when SpoolManager is absent."""
+        extruder_position = int(extruder_position)
+        if extruder_position < 1:
+            raise ValueError("Extruder positions must be positive")
+        self._add_setting(f"manual_filament_{extruder_position}", filament_type)
+        self._update_setting(f"manual_filament_{extruder_position}", filament_type)
+
+    def get_manual_filaments(self, extruder_count: int) -> List[Optional[str]]:
+        """Return one fallback material entry per configured extruder."""
+        con = db.get_db(self.data_folder)
+        cursor = con.cursor()
+        filaments = []
+        for position in range(1, int(extruder_count) + 1):
+            cursor.execute("SELECT data FROM filament_data WHERE id = ?",
+                           (f"manual_filament_{position}",))
+            row = cursor.fetchone()
+            filaments.append(str(row[0]) if row and row[0] not in (None, "") else None)
+        con.close()
+        return filaments
