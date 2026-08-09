@@ -2,6 +2,10 @@
 
 This plugin validates slicer profile, nozzle size (for each extruder), build plate, and filament type (for each
 extruder) before starting a print.
+
+When OctoPrint RME Compatibility supplies a logical-to-physical tool mapping,
+validation runs after mapping confirmation and checks each logical slicer tool
+against the selected physical tool's nozzle and SpoolManager assignment.
 It uses the slicer config present in the gcode to work, it is not a replacement for checking yourself but can help to
 prevent simple
 mistakes from occurring
@@ -77,6 +81,22 @@ material type reported by SpoolManager, while **Validate filament/spool names** 
 `sm_name` value from filament notes. Either check can be disabled without disabling the
 other nozzle, build-plate, printer-model, or tool-count checks.
 
+### Early file validation
+
+Version 3.3.0 can validate local G-code before print start. Enable **Validate local G-code
+files when uploaded** to check each newly uploaded machine-code file automatically, or use
+the checkmark button on any local G-code row in OctoPrint's Files panel to validate it on
+demand. Files stored on the printer's SD card do not show the button because OctoPrint
+cannot read them for validation.
+
+A successful result is stored with the file and reused at print start, including after an
+OctoPrint restart. It is reused only when the file's size and modification/change timestamps
+and the complete validation configuration still match. Printer-profile, build-plate,
+extruder/nozzle, SpoolManager filament/name, validation-setting, and logical-to-physical tool
+mapping changes all force a normal pre-print validation instead.
+Choosing **Continue anyway** or ignoring a spool mismatch applies only to that validation
+request and is never stored as a reusable success.
+
 ## Multi Extruder Support
 
 When configured in octoprint, this plugin supports multi material printers. It will check filament type on each extruder
@@ -129,6 +149,4 @@ Nothing major at the moment, just bug fixes, removing unused functions, and othe
 -  ** Add the ability to change the spool type in the gcode from the octoprint webui.
 
 
-- Add the ability to auto scan new files for compatibility when they are uploaded and remove them if they are not
-  compatible
 - Add the ability to scan all files and remove ones that aren't compatible

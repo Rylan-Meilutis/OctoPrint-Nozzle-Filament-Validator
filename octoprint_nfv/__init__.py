@@ -1,6 +1,9 @@
 # coding=utf-8
 from __future__ import absolute_import, annotations
 
+import hashlib
+import json
+import os
 import threading
 from typing import Dict, List
 
@@ -8,7 +11,7 @@ import flask
 import octoprint.plugin
 from flask_login import current_user
 from octoprint.events import Events
-from octoprint.filemanager import FileDestinations
+from octoprint.filemanager import FileDestinations, valid_file_type
 
 import octoprint_nfv.build_plate as build_plate
 import octoprint_nfv.extruders as extruders
@@ -44,6 +47,9 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self._validation_lock = threading.RLock()
         self._validation_result = None
         self._validation_path = None
+        self._validation_cache = {}
+        self._validation_jobs = set()
+        self._validation_jobs_lock = threading.Lock()
 
     def get_api_commands(self):
         """
@@ -68,6 +74,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             update_check_spool_id_timeout=["timeout"],
             update_check_spool_id=["checkSpoolId"],
             update_filament_type_checking=["enabled"],
+            update_validate_on_upload=["enabled"],
+            validate_file=["path", "origin"],
             add_extruder=["nozzleId", "extruderPosition"],
             remove_extruder=["extruderId"],
             set_multiple_tool_heads=["value"],
@@ -92,12 +100,14 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         check_spool_id_timeout = self.filament.get_timeout()
         check_filament_type = str(self.filament.get_enable_filament_type_checking())
         active_prompt = self.validator.get_active_prompt()
+        validate_on_upload = self._settings.get_boolean(["validate_on_upload"])
         return flask.jsonify(nozzles=nozzles, number_of_extruders=number_of_extruders,
                              build_plates=build_plates, currentBuildPlate=current_build_plate,
                              currentBuildPlateFilaments=current_build_plate_filaments, filaments=filaments,
                              isMultiExtruder=is_multi_extruder, check_spool_id=check_ids,
                              check_spool_id_timeout=check_spool_id_timeout,
                              check_filament_type=check_filament_type,
+                             validate_on_upload=validate_on_upload,
                              active_prompt=active_prompt)
 
     def on_api_command(self, command: str, data: Dict) -> flask.response:
@@ -107,7 +117,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         :param data: the data to handle
         :return:
         """
-        if current_user.is_anonymous():
+        if current_user.is_anonymous:
             return flask.abort(403)
 
         if command == "addNozzle":
@@ -286,6 +296,28 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                 self.filament.update_enable_filament_type_checking(enabled)
                 return flask.jsonify(success=True)
             flask.abort(400)
+        elif command == "update_validate_on_upload":
+            value = data.get("enabled")
+            if value is not None:
+                enabled = value if isinstance(value, bool) else str(value).lower() in ("1", "true", "yes", "on")
+                self._settings.set_boolean(["validate_on_upload"], enabled)
+                self._settings.save()
+                return flask.jsonify(success=True)
+            flask.abort(400)
+        elif command == "validate_file":
+            path = data.get("path")
+            origin = data.get("origin")
+            if not path or origin != FileDestinations.LOCAL:
+                return flask.abort(400)
+            try:
+                disk_path = self._file_manager.path_on_disk(FileDestinations.LOCAL, path)
+            except Exception:
+                self._logger.exception("Could not resolve requested GCODE path %r", path)
+                return flask.abort(404)
+            if not os.path.isfile(disk_path):
+                return flask.abort(404)
+            started = self._start_file_validation(disk_path, path, "manual")
+            return flask.jsonify(success=True, started=started)
         return flask.abort(400)
 
     def send_alert(self, message: str, alert_type: str = alert_types.popup) -> None:
@@ -355,9 +387,207 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                 self._validation_result = None
                 self._validation_path = None
 
+        if event == getattr(Events, "UPLOAD", "Upload"):
+            if (self._settings.get_boolean(["validate_on_upload"])
+                    and payload.get("target") == FileDestinations.LOCAL
+                    and payload.get("path")
+                    and valid_file_type(payload["path"], type="machinecode")):
+                storage_path = payload["path"]
+                try:
+                    disk_path = self._file_manager.path_on_disk(FileDestinations.LOCAL, storage_path)
+                except Exception:
+                    self._logger.exception("Could not resolve uploaded GCODE path %r", storage_path)
+                else:
+                    self._start_file_validation(disk_path, storage_path, "upload")
+
+        if event == getattr(Events, "FILE_REMOVED", "FileRemoved"):
+            if payload.get("storage") == FileDestinations.LOCAL and payload.get("path"):
+                try:
+                    disk_path = self._file_manager.path_on_disk(FileDestinations.LOCAL, payload["path"])
+                except Exception:
+                    disk_path = None
+                if disk_path:
+                    self._validation_cache.pop(os.path.realpath(disk_path), None)
+
         if "PrinterProfile" in event or event == Events.CONNECTED:
             self.extruders.update_data()
             self.send_alert("", "reload")
+
+    def set_tool_mapping(self, mapping: Dict[int, int]) -> None:
+        """Receive RME's confirmed mapping before preflight validation runs."""
+        if self.validator is None:
+            raise RuntimeError("Nozzle Filament Validator is not initialized")
+        with self._validation_lock:
+            self.validator.set_tool_mapping(mapping)
+            # The same path must be revalidated if its physical assignment
+            # changes between print attempts.
+            self._validation_result = None
+
+    @staticmethod
+    def _stable_value(value):
+        """Convert integration values into deterministic JSON-compatible data."""
+        if isinstance(value, dict):
+            return {str(key): Nozzle_filament_validatorPlugin._stable_value(item)
+                    for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))}
+        if isinstance(value, (list, tuple)):
+            return [Nozzle_filament_validatorPlugin._stable_value(item) for item in value]
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return repr(value)
+
+    def _validation_config_hash(self) -> str:
+        """Hash every live input that can affect ``validator.check_print``."""
+        profile = self._printer_profile_manager.get_current_or_default()
+        extruder_count = self.extruders.get_number_of_extruders()
+        config = {
+            "printer_profile": profile,
+            "build_plate": {
+                "id": self.build_plate.get_current_build_plate_id(),
+                "name": self.build_plate.get_current_build_plate_name(),
+                "filaments": self.build_plate.get_current_build_plate_filaments(),
+            },
+            "nozzles": [self.extruders.get_nozzle_size_for_extruder(position)
+                        for position in range(1, extruder_count + 1)],
+            "loaded_filaments": self._spool_manager.get_loaded_filaments(),
+            "spool_names": self._spool_manager.get_names(),
+            "check_spool_names": self.filament.get_enable_spool_checking(),
+            "check_filament_types": self.filament.get_enable_filament_type_checking(),
+            "validation_timeout": self.filament.get_timeout(),
+            "tool_mapping": getattr(self.validator, "_tool_mapping", {}),
+        }
+        serialized = json.dumps(self._stable_value(config), sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _file_signature(path: str) -> Dict[str, int]:
+        stat = os.stat(path)
+        return {
+            "size": stat.st_size,
+            "mtime_ns": getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1_000_000_000)),
+            "ctime_ns": getattr(stat, "st_ctime_ns", int(stat.st_ctime * 1_000_000_000)),
+        }
+
+    def _storage_path_for_disk_path(self, disk_path: str):
+        try:
+            return self._file_manager.path_in_storage(FileDestinations.LOCAL, disk_path)
+        except Exception:
+            return None
+
+    def _write_validation_cache(self, disk_path: str, storage_path: str,
+                                file_signature: Dict[str, int], config_hash: str) -> None:
+        record = {"version": 1, "file": file_signature, "config": config_hash}
+        normalized_path = os.path.realpath(disk_path)
+        self._validation_cache[normalized_path] = record
+        storage_path = storage_path or self._storage_path_for_disk_path(disk_path)
+        if storage_path:
+            try:
+                self._file_manager.set_additional_metadata(
+                    FileDestinations.LOCAL, storage_path, "nozzle_filament_validator",
+                    record, overwrite=True)
+            except Exception:
+                self._logger.warning("Could not persist validation metadata for %s", storage_path, exc_info=True)
+
+    def _read_validation_cache(self, disk_path: str, storage_path: str = None):
+        normalized_path = os.path.realpath(disk_path)
+        record = self._validation_cache.get(normalized_path)
+        if record is not None:
+            return record
+        storage_path = storage_path or self._storage_path_for_disk_path(disk_path)
+        if not storage_path:
+            return None
+        try:
+            record = self._file_manager.get_additional_metadata(
+                FileDestinations.LOCAL, storage_path, "nozzle_filament_validator")
+        except Exception:
+            self._logger.debug("Could not read validation metadata for %s", storage_path, exc_info=True)
+            return None
+        if isinstance(record, dict):
+            self._validation_cache[normalized_path] = record
+            return record
+        return None
+
+    def _remove_validation_cache(self, disk_path: str, storage_path: str = None) -> None:
+        self._validation_cache.pop(os.path.realpath(disk_path), None)
+        storage_path = storage_path or self._storage_path_for_disk_path(disk_path)
+        if storage_path:
+            try:
+                self._file_manager.remove_additional_metadata(
+                    FileDestinations.LOCAL, storage_path, "nozzle_filament_validator")
+            except Exception:
+                self._logger.debug("Could not remove validation metadata for %s", storage_path, exc_info=True)
+
+    def _cached_validation_matches(self, disk_path: str, storage_path: str = None) -> bool:
+        try:
+            record = self._read_validation_cache(disk_path, storage_path)
+            matches = bool(record and record.get("version") == 1
+                           and record.get("file") == self._file_signature(disk_path)
+                           and record.get("config") == self._validation_config_hash())
+            if record and not matches:
+                self._remove_validation_cache(disk_path, storage_path)
+            return matches
+        except Exception:
+            self._logger.debug("Could not verify cached validation for %s", disk_path, exc_info=True)
+            return False
+
+    def _validate_and_cache(self, disk_path: str, storage_path: str = None) -> bool:
+        """Validate once and cache only an unchanged file/configuration pass."""
+        # An explicit new check supersedes any older pass, even when this one
+        # is cancelled or fails before it can write a replacement.
+        self._remove_validation_cache(disk_path, storage_path)
+        try:
+            initial_file = self._file_signature(disk_path)
+            initial_config = self._validation_config_hash()
+        except Exception:
+            self._logger.warning("Could not snapshot validation inputs for %s; result will not be cached",
+                                 disk_path, exc_info=True)
+            return bool(self.validator.check_print(disk_path))
+
+        result = bool(self.validator.check_print(disk_path))
+        if not result:
+            return False
+        if not getattr(self.validator, "last_check_cacheable", True):
+            self._logger.info("Validation was explicitly overridden; allowing this request without caching it")
+            return True
+
+        try:
+            final_file = self._file_signature(disk_path)
+            final_config = self._validation_config_hash()
+        except Exception:
+            self._logger.warning("Could not verify validation inputs for %s; result will not be cached",
+                                 disk_path, exc_info=True)
+            return True
+
+        if initial_file != final_file or initial_config != final_config:
+            self.send_alert("The file or printer configuration changed during validation; please validate again.",
+                            alert_types.error)
+            return False
+
+        self._write_validation_cache(disk_path, storage_path, final_file, final_config)
+        return True
+
+    def _start_file_validation(self, disk_path: str, storage_path: str, source: str) -> bool:
+        """Start a deduplicated background validation requested by upload or UI."""
+        normalized_path = os.path.realpath(disk_path)
+        with self._validation_jobs_lock:
+            if normalized_path in self._validation_jobs:
+                return False
+            self._validation_jobs.add(normalized_path)
+
+        def run():
+            try:
+                with self._validation_lock:
+                    self._logger.info("Validating %s GCODE %s", source, storage_path)
+                    self._validate_and_cache(disk_path, storage_path)
+            except Exception:
+                self._logger.exception("Unexpected error during %s validation of %s", source, storage_path)
+                self.send_alert("File validation failed because of an unexpected error.", alert_types.error)
+            finally:
+                with self._validation_jobs_lock:
+                    self._validation_jobs.discard(normalized_path)
+
+        thread = threading.Thread(target=run, name="nfv-file-validation", daemon=True)
+        thread.start()
+        return True
 
     def _get_selected_file_path(self, comm_instance=None):
         """Return the selected local job's absolute path, when available."""
@@ -405,9 +635,13 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                 self._validation_result = None
 
             if self._validation_result is None:
-                self._logger.info("Validating selected GCODE before its first command is queued")
                 try:
-                    self._validation_result = bool(self.validator.check_print(path))
+                    if path and self._cached_validation_matches(path):
+                        self._logger.info("Using unchanged cached validation for selected GCODE")
+                        self._validation_result = True
+                    else:
+                        self._logger.info("Validating selected GCODE before its first command is queued")
+                        self._validation_result = self._validate_and_cache(path)
                 except Exception:
                     self._logger.exception("Unexpected error during pre-print validation")
                     self.send_alert("Print blocked: an unexpected validation error occurred.", alert_types.error)
@@ -457,6 +691,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     def get_settings_defaults(self):
         return {
+            "validate_on_upload": False,
         }
 
     # ~~ Software update hook
@@ -519,5 +754,10 @@ def __plugin_load__() -> None:
     global __plugin_hooks__
     __plugin_hooks__ = {
         "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
-        "octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.validate_before_queuing,
+        # RME acquires its mapping hold in beforePrintStarted. This later hook
+        # runs only after RME supplies the confirmed physical mapping and
+        # releases the job queue.
+        "octoprint.comm.protocol.gcode.queuing": (
+            __plugin_implementation__.validate_before_queuing, 100
+        ),
     }

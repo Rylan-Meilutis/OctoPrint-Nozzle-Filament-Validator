@@ -37,6 +37,14 @@ class _Extruders:
         return 0.4
 
 
+class _RemappedExtruders:
+    def get_number_of_extruders(self):
+        return 2
+
+    def get_nozzle_size_for_extruder(self, position):
+        return {1: 0.6, 2: 0.4}[position]
+
+
 class _SpoolManager:
     def get_loaded_filaments(self):
         return -1
@@ -124,6 +132,7 @@ class ValidatorTests(unittest.TestCase):
 
     def test_valid_file_passes_without_spool_manager(self):
         self.assertTrue(self.validator.check_print(self.write_gcode(VALID_GCODE)))
+        self.assertTrue(self.validator.last_check_cacheable)
         self.assertFalse(self.printer.cancelled)
         self.assertFalse(self.printer.paused)
 
@@ -144,6 +153,7 @@ class ValidatorTests(unittest.TestCase):
         timer.start()
         self.addCleanup(timer.cancel)
         self.assertTrue(self.validator.check_print(self.write_gcode("G28\n")))
+        self.assertFalse(self.validator.last_check_cacheable)
 
     def test_filament_type_toggle_is_independent_of_spool_name_toggle(self):
         self.validator._filament = _TypesDisabledFilament()
@@ -162,6 +172,18 @@ class ValidatorTests(unittest.TestCase):
     def test_skip_validation_directive_is_explicit(self):
         self.assertTrue(self.validator.check_print(self.write_gcode("G28\n; skip_validation\n")))
         self.assertFalse(self.validator.check_print(self.write_gcode("G28\n; skip_validation_but_not_really\n")))
+
+    def test_remapped_tool_uses_physical_nozzle_and_filament(self):
+        self.validator.extruders = _RemappedExtruders()
+        self.validator.set_tool_mapping({0: 1})
+        self.assertEqual(1, self.validator.physical_tool(0))
+        self.assertEqual((True, True), self.validator.check_nozzle(0, ["0.4"], True))
+        self.assertEqual(
+            (True, True),
+            self.validator.check_filament_type(
+                0, ["ABS", "PLA"], ["PLA"], {"filament_type": ["PLA"]}, True, False
+            ),
+        )
 
 
 if __name__ == "__main__":

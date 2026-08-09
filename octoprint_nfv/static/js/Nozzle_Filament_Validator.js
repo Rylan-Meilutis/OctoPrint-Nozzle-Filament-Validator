@@ -116,6 +116,12 @@ function createExtruderTabs(extrudersArray, response) {
                 <input type="checkbox" id="check-filament-type-checkbox" ${response.check_filament_type === "True" ? 'checked' : ''}>
                 <label for="check-filament-type-checkbox">Validate filament types</label>
             </div>
+            <div class="form-group">
+                <input type="checkbox" id="validate-on-upload-checkbox" ${response.validate_on_upload ? 'checked' : ''}>
+                <label for="validate-on-upload-checkbox">Validate local G-code files when uploaded</label>
+                <p>A successful result is reused at print start only while both the file and current printer
+                configuration remain unchanged.</p>
+            </div>
             <!-- Input field to set check_spool_id_timeout -->
             <div class="form-group">
                 <label for="check-spool-id-timeout-input">Validation Response Timeout</label>
@@ -259,7 +265,55 @@ $(function () {
     /**
      * this function is called when the plugin receives a message from the server
      */
-    function messageHandler() {
+    function messageHandler(parameters) {
+        let filesViewModel = parameters[2];
+
+        if (filesViewModel) {
+            filesViewModel.validateWithNozzleFilamentValidator = function (file) {
+                if (!file || file.origin !== "local" || !file.path) {
+                    return;
+                }
+                OctoPrint.simpleApiCommand(PLUGIN_ID, "validate_file", {
+                    path: file.path,
+                    origin: file.origin
+                }).done(function (response) {
+                    if (!response.started) {
+                        new PNotify({
+                            title: "Nozzle Filament Validator",
+                            text: "That file is already being validated.",
+                            type: "info",
+                            hide: true
+                        });
+                    }
+                }).fail(function () {
+                    new PNotify({
+                        title: "Nozzle Filament Validator",
+                        text: "The selected local file could not be validated.",
+                        type: "error",
+                        hide: false
+                    });
+                });
+            };
+
+            // Extend OctoPrint's machine-code row before Knockout instantiates it.
+            // This avoids replacing the core files view model or duplicating its template.
+            let machinecodeTemplate = $("#files_template_machinecode");
+            let templateHtml = machinecodeTemplate.html();
+            if (templateHtml && templateHtml.indexOf("btn-nfv-validate") === -1) {
+                let selectButton = templateHtml.indexOf("btn-files-select");
+                let insertionPoint = selectButton === -1 ? -1 : templateHtml.lastIndexOf("<", selectButton);
+                let validateButton = '<div class="btn btn-mini btn-nfv-validate" ' +
+                    'data-bind="visible: origin === \'local\' && $root.loginState.isUser(), ' +
+                    'click: function() { $root.validateWithNozzleFilamentValidator($data); }" ' +
+                    'title="Validate for current configuration" aria-label="Validate for current configuration" ' +
+                    'role="link"><i class="fas fa-check-circle"></i></div>';
+                if (insertionPoint !== -1) {
+                    machinecodeTemplate.html(templateHtml.slice(0, insertionPoint) + validateButton +
+                        templateHtml.slice(insertionPoint));
+                }
+            }
+        }
+
         /**
          * This function is called when the plugin receives a message from the server
          * @param plugin The plugin that sent the message
@@ -543,7 +597,7 @@ $(function () {
     OCTOPRINT_VIEWMODELS.push({
         construct: messageHandler,
         additionalNames: ["messageHandler"],
-        dependencies: ["loginStateViewModel", "appearanceViewModel"],
+        dependencies: ["loginStateViewModel", "appearanceViewModel", "filesViewModel"],
         elements: [""]
     });
 

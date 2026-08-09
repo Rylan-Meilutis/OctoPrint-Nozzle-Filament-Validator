@@ -15,6 +15,9 @@ function setRefreshButtons() {
     $('#check-filament-type-checkbox').change(function () {
         update_filament_type_checking(this.checked);
     });
+    $('#validate-on-upload-checkbox').change(function () {
+        update_validate_on_upload(this.checked);
+    });
     $('#check-spool-id-timeout-input').change(function () {
         update_check_spool_id_timeout(this.value);
     });
@@ -34,6 +37,14 @@ function update_check_spool_id(isChecked) {
 
 function update_filament_type_checking(isChecked) {
     OctoPrint.simpleApiCommand(PLUGIN_ID, "update_filament_type_checking", {
+        "enabled": isChecked
+    }).done(function () {
+        displayData();
+    });
+}
+
+function update_validate_on_upload(isChecked) {
+    OctoPrint.simpleApiCommand(PLUGIN_ID, "update_validate_on_upload", {
         "enabled": isChecked
     }).done(function () {
         displayData();

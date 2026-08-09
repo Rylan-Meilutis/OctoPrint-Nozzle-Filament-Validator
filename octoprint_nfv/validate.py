@@ -178,6 +178,29 @@ class validator:
         self._prompt_lock = threading.RLock()
         self._active_prompt = None
         self._prompt_deadline = None
+        self.last_check_cacheable = False
+        self._validation_was_overridden = False
+        # Keys are zero-based slicer/logical tools and values are zero-based
+        # physical tools. Identity is the safe default when RME is absent.
+        self._tool_mapping = {}
+
+    def set_tool_mapping(self, mapping: Dict[int, int]) -> None:
+        """Set the confirmed logical-to-physical mapping for the next checks."""
+        normalized = {int(logical): int(physical) for logical, physical in mapping.items()}
+        if any(logical < 0 or physical < 0 for logical, physical in normalized.items()):
+            raise ValueError("Tool mapping indices must be non-negative")
+        self._tool_mapping = normalized
+
+    def physical_tool(self, logical_tool: int) -> int:
+        """Resolve a slicer tool to the physical tool configured by RME."""
+        logical_tool = int(logical_tool)
+        return self._tool_mapping.get(logical_tool, logical_tool)
+
+    def _tool_description(self, logical_tool: int) -> str:
+        physical = self.physical_tool(logical_tool)
+        if physical == logical_tool:
+            return f"extruder {logical_tool + 1}"
+        return f"logical extruder {logical_tool + 1} (physical tool {physical + 1})"
 
     def pause_print(self) -> None:
         """
@@ -245,6 +268,7 @@ class validator:
             time.sleep(0.1)
 
         if self.filament_wait_status == filament_timeout.ok:
+            self._validation_was_overridden = True
             self.send_alert("Validation warning acknowledged; continuing at the user's request.", alert_types.info)
             return True
 
@@ -259,6 +283,8 @@ class validator:
         :param file_path: The path to the GCODE file
         """
         self.paused = False
+        self.last_check_cacheable = False
+        self._validation_was_overridden = False
         if not file_path or not os.path.isfile(file_path):
             return self.prompt_validation_override(
                 f"The GCODE file {file_path!r} could not be read, so it could not be validated.")
@@ -279,6 +305,7 @@ class validator:
 
         if skip_validation:
             self._logger.warning("GCODE validation explicitly skipped by file directive")
+            self.last_check_cacheable = True
             return True
 
         nozzles = gcode_info["nozzle_size"]
@@ -375,6 +402,7 @@ class validator:
 
             # Check if the print passed all checks
             if nozzle_passed and filament_passed and spool_passed:
+                self.last_check_cacheable = not self._validation_was_overridden
                 self.send_alert("Print passed nozzle and filament check", alert_types.success)
                 self._logger.info("Print passed nozzle and filament check...")
                 return True
@@ -516,7 +544,12 @@ class validator:
         :param mmu_single_mode: whether the printer is in mmu single mode
         :return: (filament_passed, check_passed) the value filament passed and true if the check passed
         """
-        loaded_filament = loaded_filaments[index] if loaded_filaments is not None else None
+        physical_index = self.physical_tool(index)
+        loaded_filament = (
+            loaded_filaments[physical_index]
+            if loaded_filaments is not None and physical_index < len(loaded_filaments)
+            else None
+        )
 
         # Check if the loaded filament matches the filament alert_type in the GCODE
         if filament_types[index] is None and filament_passed and not mmu_single_mode:
@@ -546,7 +579,7 @@ class validator:
             if (filament_types[index].lower() != str(loaded_filament).lower() and gcode_info[
                 "filament_type"][index] is not
                     None):
-                self.send_alert(f"Validation warning: Incorrect filament type on extruder {index + 1}. expected "
+                self.send_alert(f"Validation warning: Incorrect filament type on {self._tool_description(index)}. expected "
                                 f"{filament_types[index]}, but {loaded_filament} is currently loaded",
                                 alert_types.error)
                 return filament_passed, False
@@ -562,6 +595,10 @@ class validator:
         :return: (nozzle_passed, check_passed) the value of nozzle_passed and true if the check passed
         """
 
+        # NFV's database uses one-based physical extruder positions while GCODE
+        # metadata and the RME mapping use zero-based logical indices.
+        physical_position = self.physical_tool(index) + 1
+
         # Check if the loaded nozzle size matches the nozzle size in the GCODE
         if nozzles[index] is None and nozzle_passed:
             self.send_alert("No nozzle size found in GCODE, error checking won't be performed",
@@ -569,19 +606,19 @@ class validator:
             nozzle_passed = False
 
         # Check if the nozzle size is None and nozzle_passed is True
-        elif self.extruders.get_nozzle_size_for_extruder(index + 1) is None and nozzle_passed:
-            self.send_alert(f"No nozzle selected for extruder {index + 1}, error checking won't be performed",
+        elif self.extruders.get_nozzle_size_for_extruder(physical_position) is None and nozzle_passed:
+            self.send_alert(f"No nozzle selected for {self._tool_description(index)}, error checking won't be performed",
                             alert_types.info)
             nozzle_passed = False
 
         # Check if the nozzle size is not None and nozzle_passed is True
         if nozzle_passed:
-            if (float(nozzles[index]) != float(self.extruders.get_nozzle_size_for_extruder(index + 1)) and
+            if (float(nozzles[index]) != float(self.extruders.get_nozzle_size_for_extruder(physical_position)) and
                     nozzles[index] is
                     not None):
-                self.send_alert(f"Validation warning: Incorrect nozzle size on extruder {index + 1}. expected "
+                self.send_alert(f"Validation warning: Incorrect nozzle size on {self._tool_description(index)}. expected "
                                 f"{nozzles[index]}mm nozzle, but"
-                                f" {self.extruders.get_nozzle_size_for_extruder(index + 1)}mm nozzle is currently "
+                                f" {self.extruders.get_nozzle_size_for_extruder(physical_position)}mm nozzle is currently "
                                 f"installed", alert_types.error)
                 return nozzle_passed, False
         return nozzle_passed, True
@@ -629,19 +666,23 @@ class validator:
 
         match = re.search(r"\[\s*sm_name\s*=\s*([^]]*\S)]", raw_data)
 
-        current_fil_id = self._spool_manager.get_names()[index]
+        physical_index = self.physical_tool(index)
+        selected_names = self._spool_manager.get_names()
+        current_fil_id = selected_names[physical_index] if physical_index < len(selected_names) else None
 
         if match:
             spool_id = str(match.group(1))
             if current_fil_id is None:
+                self._validation_was_overridden = True
                 self.update_filament_wait_status(filament_timeout.waiting)
-                message = f"{spool_id}, {index}, None Selected, {self._filament.get_timeout()}"
+                message = f"{spool_id}, {physical_index}, None Selected, {self._filament.get_timeout()}"
                 prompt = self.set_active_prompt(alert_types.switch_spools, message, timeout)
                 self._plugin_manager.send_plugin_message(self._identifier, prompt)
 
             elif str(current_fil_id) != spool_id:
+                self._validation_was_overridden = True
                 self.update_filament_wait_status(filament_timeout.waiting)
-                message = f"{spool_id}, {index}, {current_fil_id}, {self._filament.get_timeout()}"
+                message = f"{spool_id}, {physical_index}, {current_fil_id}, {self._filament.get_timeout()}"
                 prompt = self.set_active_prompt(alert_types.switch_spools, message, timeout)
                 self._plugin_manager.send_plugin_message(self._identifier, prompt)
 
