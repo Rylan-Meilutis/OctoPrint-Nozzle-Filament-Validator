@@ -11,3 +11,4 @@ class alert_types:
     success = "success"
     reload = "reload"
     switch_spools = "switch_spools"
+    validation_prompt = "validation_prompt"

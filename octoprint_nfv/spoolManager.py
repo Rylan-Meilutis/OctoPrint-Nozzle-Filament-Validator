@@ -25,6 +25,8 @@ class SpoolManagerIntegration:
         :return:
         """
         try:
+            if self._impl is None:
+                return []
             materials = self._impl.api_getSelectedSpoolInformations()
             materials = [
                 f"{m['material']}_{m['colorName']}_{m['color']}"
@@ -121,6 +123,8 @@ class SpoolManagerIntegration:
         :return:
         """
         try:
+            if self._impl is None:
+                return []
             spool_names = self._impl.api_getSelectedSpoolInformations()
             spool_names = [
                 f"{m['spoolName']}"

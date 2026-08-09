@@ -12,6 +12,9 @@ function setRefreshButtons() {
     $('#check-spool-id-checkbox').change(function () {
         update_check_spool_id(this.checked);
     });
+    $('#check-filament-type-checkbox').change(function () {
+        update_filament_type_checking(this.checked);
+    });
     $('#check-spool-id-timeout-input').change(function () {
         update_check_spool_id_timeout(this.value);
     });
@@ -25,6 +28,14 @@ function update_check_spool_id(isChecked) {
     OctoPrint.simpleApiCommand(PLUGIN_ID, "update_check_spool_id", {
         "checkSpoolId": isChecked ? 1 : 0
     }).done(function (response) {
+        displayData();
+    });
+}
+
+function update_filament_type_checking(isChecked) {
+    OctoPrint.simpleApiCommand(PLUGIN_ID, "update_filament_type_checking", {
+        "enabled": isChecked
+    }).done(function () {
         displayData();
     });
 }
@@ -100,4 +111,3 @@ function get_spools() {
         });
     });
 }
-

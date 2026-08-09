@@ -1,5 +1,7 @@
 const PLUGIN_ID = "Nozzle_Filament_Validator";
 let activeTabId = "";
+let validatorMessageHandler = null;
+let activePromptKey = null;
 
 /**
  * Function to sleep for a given time in ms
@@ -31,6 +33,7 @@ function displayGeneralInfo(response) {
  * @param state The state to update to
  */
 function updateWaitState(state) {
+    activePromptKey = null;
     OctoPrint.simpleApiCommand(PLUGIN_ID, "updateWaitState", {"state": state}).done(function (response) {
         displayData();
     });
@@ -107,14 +110,18 @@ function createExtruderTabs(extrudersArray, response) {
             <!-- Checkbox to set check_spool_id -->
             <div class="form-group">
                 <input type="checkbox" id="check-spool-id-checkbox" ${response.check_spool_id === "True" ? 'checked' : ''}>
-                <label for="check-spool-id-checkbox">Check Spool ID</label>
+                <label for="check-spool-id-checkbox">Validate filament/spool names</label>
+            </div>
+            <div class="form-group">
+                <input type="checkbox" id="check-filament-type-checkbox" ${response.check_filament_type === "True" ? 'checked' : ''}>
+                <label for="check-filament-type-checkbox">Validate filament types</label>
             </div>
             <!-- Input field to set check_spool_id_timeout -->
             <div class="form-group">
-                <label for="check-spool-id-timeout-input">Check Spool ID Timeout</label>
+                <label for="check-spool-id-timeout-input">Validation Response Timeout</label>
                 <input type="number" id="check-spool-id-timeout-input" placeholder="Enter timeout" step="1" value="${response.check_spool_id_timeout}">
-                <p>The timeout determines how long it takes with no action until the print is aborted if the spool id in 
-                the gcode doesn't match the id in Spool Manager (default 300 seconds)</p>
+                <p>How long the plugin waits for a validation or spool-name decision before blocking the print
+                (default 300 seconds).</p>
             </div>
             
             <hr>
@@ -131,7 +138,7 @@ function createExtruderTabs(extrudersArray, response) {
         let extruderNozzleSize = extruder.nozzleSize || "Nozzle size not available";
         let extruderFilamentType = extruder.filamentType || "Filament type not available";
         let extruderFilamentName = extruder.spoolName || "Filament DB ID not available";
-        let check_spool_id = response.check_spool_id >= "True" || false;
+        let check_spool_id = response.check_spool_id === "True";
 
         $('#myTabs').append(`
             <li class="nav-item" id="#extruder-${extruderPosition}">
@@ -212,7 +219,8 @@ function fetchExtruderInfo(numberOfExtruders) {
                     text: 'Failed to fetch extruder information for extruder ' + (i + 1) + '.',
                     type: 'error',
                     hide: false
-                })
+                });
+                reject(error);
             });
         });
         promises.push(promise);
@@ -226,6 +234,9 @@ function fetchExtruderInfo(numberOfExtruders) {
  */
 function displayData() {
     OctoPrint.simpleApiGet(PLUGIN_ID).done(function (response) {
+        if (response.active_prompt && validatorMessageHandler) {
+            validatorMessageHandler(PLUGIN_ID, response.active_prompt);
+        }
         fetchExtruderInfo(response.number_of_extruders)
             .then((responses) => {
                 let extruderArray = responses;
@@ -263,6 +274,57 @@ $(function () {
                 return;
             }
 
+            if (data.type === "validation_prompt" || data.type === "switch_spools") {
+                let promptKey = data.type + ":" + data.msg;
+                if (activePromptKey === promptKey) {
+                    return;
+                }
+                activePromptKey = promptKey;
+            }
+
+            if (data.type === "validation_prompt") {
+                let resolved = false;
+                let timeout = Math.max(0, Number(data.timeout) || 0);
+                let safeMessage = $('<div>').text(data.msg).html();
+                new PNotify({
+                    title: 'Print validation warning',
+                    text: safeMessage + '<br><br>Continue with this print anyway?',
+                    type: 'error',
+                    icon: 'fas fa-exclamation-triangle',
+                    hide: timeout > 0,
+                    delay: timeout * 1000,
+                    closer: false,
+                    sticker: false,
+                    destroy: true,
+                    buttons: {closer: false, sticker: false},
+                    confirm: {
+                        confirm: true,
+                        buttons: [{
+                            text: 'Continue anyway',
+                            primary: true,
+                            click: notice => {
+                                resolved = true;
+                                updateWaitState("ok");
+                                notice.remove();
+                            }
+                        }, {
+                            text: 'Cancel print',
+                            click: notice => {
+                                resolved = true;
+                                updateWaitState("cancel");
+                                notice.remove();
+                            }
+                        }]
+                    },
+                    before_close: function () {
+                        if (!resolved) {
+                            updateWaitState("cancel");
+                        }
+                    }
+                });
+                return;
+            }
+
             if (data.type === "switch_spools") {
                 get_spools().then((raw_spool_data) => {
                     let raw_data = data.msg.split(",");
@@ -278,7 +340,9 @@ $(function () {
 
                     let extruderPos = raw_data[1].replace(" ", "");
                     let currentName = raw_data[2].replace(" ", "");
-                    let timeout = raw_data[3].replace(" ", "");
+                    let timeout = data.timeout !== undefined
+                        ? Math.max(0, Number(data.timeout) || 0)
+                        : raw_data[3].replace(" ", "");
 
                     if (raw_spool_data === undefined || raw_spool_data.length === 0) {
                         alert("No spools found in Spool Manager. Please add a spool to Spool Manager before continuing.");
@@ -299,7 +363,8 @@ $(function () {
                             text: 'The spool specified in the gcode (name: ' + desiredName + ') does not match the spool ' +
                                 'loaded in Spool Manager (name: ' + currentName + '). The desired spool was not found. Which of the following is true?',
                             icon: 'fas fa-question-circle',
-                            hide: false,
+                            hide: true,
+                            delay: Number(timeout) * 1000,
                             closer: false,
                             sticker: false,
                             destroy: true,
@@ -347,9 +412,6 @@ $(function () {
                             }, before_close: function (notice) {
                                 updateWaitState("cancel")
                             },
-                            // Close the notification after 5000 milliseconds (5 seconds)
-                            autoClose: $(timeout) ? timeout * 1000 : 5000
-
                         });
                         return;
                     }
@@ -359,7 +421,8 @@ $(function () {
                         text: 'The spool specified in the gcode (name: ' + desiredName + ') does not match the spool ' +
                             'loaded in Spool Manager (name: ' + currentName + '). Which of the following is true?',
                         icon: 'fas fa-question-circle',
-                        hide: false,
+                        hide: true,
+                        delay: Number(timeout) * 1000,
                         closer: false,
                         sticker: false,
                         destroy: true,
@@ -426,8 +489,6 @@ $(function () {
                         }, before_close: function (notice) {
                             updateWaitState("cancel")
                         },
-                        // Close the notification after 5000 milliseconds (5 seconds)
-                        autoClose: $(timeout) ? timeout * 1000 : 5000
                     });
 
                 }).catch((error) => {
@@ -474,6 +535,7 @@ $(function () {
                 });
             }
         }
+        validatorMessageHandler = this.onDataUpdaterPluginMessage.bind(this);
     }
 
 
