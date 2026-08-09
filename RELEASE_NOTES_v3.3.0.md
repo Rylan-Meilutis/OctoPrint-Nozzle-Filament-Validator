@@ -30,3 +30,16 @@
 - Added RME Compatibility as a fallback metadata provider when neither SpoolManager nor Spoolman is
   available. Its `rme-filament-report-v1` per-tool loadout supplies filament materials, and
   inventory-backed spools expose stable `rme:<provider>:<id>` identifiers for name validation.
+
+## Filament provider compatibility
+
+- Validation provider priority is SpoolManager, Spoolman, RME Compatibility, then the manual
+  per-extruder material selections.
+- SpoolManager supplies the loaded material and spool name. Spoolman supplies the loaded material
+  and a stable `spoolman:<id>` identity.
+- RME Compatibility's internal spool backend supplies the same validation inputs: loaded material
+  plus a stable `rme:<provider>:<id>` identity. If RME is backed by an installed Spoolman plugin,
+  NFV uses Spoolman directly because it has higher priority.
+- RME firmware-only loadouts still support material, nozzle, build-plate, upload, and cached
+  pre-print validation. They cannot perform unique spool-name validation because firmware metadata
+  does not identify a specific physical spool.
