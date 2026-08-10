@@ -2,15 +2,8 @@ const PLUGIN_ID = "Nozzle_Filament_Validator";
 let activeTabId = "";
 let validatorMessageHandler = null;
 let activePromptKey = null;
-
-/**
- * Function to sleep for a given time in ms
- * @param time the time to sleep in ms
- * @returns {Promise<unknown>}
- */
-function sleep(time) {
-    return new Promise(resolve => setTimeout(resolve, time));
-}
+let displayDataRequest = null;
+let displayDataPending = false;
 
 // Function to fetch and display general information
 /**
@@ -239,8 +232,10 @@ function createExtruderTabs(extrudersArray, response) {
 
     }
 
-    // Event listener for the tab show event to update the activeTabId variable
-    $('a[data-toggle="tab"]').on('show.bs.tab', function (e) {
+    // Namespace and replace this plugin's handler so redraws cannot accumulate
+    // listeners on OctoPrint's persistent navigation tabs.
+    $('#myTabs').off('show.bs.tab.nfv', 'a[data-toggle="tab"]');
+    $('#myTabs').on('show.bs.tab.nfv', 'a[data-toggle="tab"]', function (e) {
         let data = e.target.getAttribute("href").slice(1);
         //check if data isn't blank and is a child of the extruder-tabs div
         if (data !== "" && $(`#${data}`).parent().attr('id') === "extruder-tabs") {
@@ -249,58 +244,37 @@ function createExtruderTabs(extrudersArray, response) {
     });
 }
 
-// Function to fetch extruder information
-/**
- * Fetches extruder information for the given number of extruders
- * @param numberOfExtruders The number of extruders to fetch information for
- * @returns {Promise<Awaited<Promise>[]>}
- */
-function fetchExtruderInfo(numberOfExtruders) {
-    let promises = [];
-
-    for (let i = 0; i < numberOfExtruders; i++) {
-        let promise = new Promise((resolve, reject) => {
-            OctoPrint.simpleApiCommand(PLUGIN_ID, "get_extruder_info", {"extruderId": i + 1})
-                .done(function (response) {
-                    resolve(response);
-                }).fail(function (error) {
-                new PNotify({
-                    title: 'Extruder Error',
-                    text: 'Failed to fetch extruder information for extruder ' + (i + 1) + '.',
-                    type: 'error',
-                    hide: false
-                });
-                reject(error);
-            });
-        });
-        promises.push(promise);
-    }
-    return Promise.all(promises);
-}
-
 // Main function to display data
 /**
  * Function to update the display window with the latest data
  */
-function displayData() {
-    OctoPrint.simpleApiGet(PLUGIN_ID).done(function (response) {
+function displayData(queueIfBusy) {
+    if (displayDataRequest) {
+        if (queueIfBusy !== false) {
+            displayDataPending = true;
+        }
+        return;
+    }
+    displayDataRequest = OctoPrint.simpleApiGet(PLUGIN_ID).done(function (response) {
         if (response.active_prompt && validatorMessageHandler) {
             validatorMessageHandler(PLUGIN_ID, response.active_prompt);
         }
-        fetchExtruderInfo(response.number_of_extruders)
-            .then((responses) => {
-                let extruderArray = responses;
-                extruderArray.sort((a, b) => (a.extruderPosition > b.extruderPosition) ? 1 : -1);
-                createExtruderTabs(extruderArray, response);
-                displayGeneralInfo(response);
-                activate_nozzle_buttons(response);
-                activate_build_plate_buttons(response);
-                activate_extruder_buttons(response);
-                setRefreshButtons();
-
-            }).catch((error) => {
-            console.error("Error fetching extruder info:", error);
-        });
+        let extruderArray = response.extruders || [];
+        extruderArray.sort((a, b) => (a.extruderPosition > b.extruderPosition) ? 1 : -1);
+        createExtruderTabs(extruderArray, response);
+        displayGeneralInfo(response);
+        activate_nozzle_buttons(response);
+        activate_build_plate_buttons(response);
+        activate_extruder_buttons(response);
+        setRefreshButtons();
+    }).fail(function (error) {
+        console.error("Error fetching Nozzle Filament Validator settings:", error);
+    }).always(function () {
+        displayDataRequest = null;
+        if (displayDataPending) {
+            displayDataPending = false;
+            displayData();
+        }
     });
 }
 
@@ -368,7 +342,9 @@ $(function () {
                 return;
             }
             if (data.type === "reload") {
-                displayData();
+                if ($('.nozzle-filament-validator:visible').length) {
+                    displayData();
+                }
                 return;
             }
 
@@ -634,6 +610,27 @@ $(function () {
             }
         }
         validatorMessageHandler = this.onDataUpdaterPluginMessage.bind(this);
+        this.onSettingsShown = function () {
+            if ($('.nozzle-filament-validator:visible').length) {
+                displayData(false);
+            }
+        };
+        $(document)
+            .off('click.nfvSettings', 'a[href="#settings_plugin_Nozzle_Filament_Validator"]')
+            .on('click.nfvSettings', 'a[href="#settings_plugin_Nozzle_Filament_Validator"]', function () {
+                window.setTimeout(function () {
+                    if ($('.nozzle-filament-validator:visible').length) {
+                        displayData(false);
+                    }
+                }, 0);
+            });
+        this.onStartupComplete = function () {
+            OctoPrint.simpleApiCommand(PLUGIN_ID, "get_active_prompt", {}).done(function (response) {
+                if (response.active_prompt && validatorMessageHandler) {
+                    validatorMessageHandler(PLUGIN_ID, response.active_prompt);
+                }
+            });
+        };
     }
 
 
@@ -642,11 +639,6 @@ $(function () {
         construct: messageHandler,
         additionalNames: ["messageHandler"],
         dependencies: ["loginStateViewModel", "appearanceViewModel", "filesViewModel"],
-        elements: [""]
-    });
-
-    // Initial display of data
-    sleep(500).then(() => {
-        displayData();
+        elements: [".nozzle-filament-validator"]
     });
 });

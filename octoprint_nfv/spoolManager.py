@@ -133,6 +133,42 @@ class SpoolManagerIntegration:
             )
             return []
 
+    def get_filament_metadata(self):
+        """Return loaded materials and names from one provider snapshot."""
+        try:
+            if self._impl is not None:
+                selected = self._impl.api_getSelectedSpoolInformations() or []
+                materials = []
+                names = []
+                for spool in selected:
+                    if spool is None:
+                        materials.append(None)
+                        names.append(None)
+                    else:
+                        materials.append(spool.get("material"))
+                        names.append(str(spool.get("spoolName"))
+                                     if spool.get("spoolName") is not None else None)
+                return materials, names
+            if self._spoolman_impl is not None:
+                selected = self._get_spoolman_selected_spools()
+                return (
+                    [(spool.get("filament") or {}).get("material") if spool else None
+                     for spool in selected],
+                    [f"spoolman:{spool['id']}"
+                     if spool and spool.get("id") is not None else None
+                     for spool in selected],
+                )
+            if self._has_rme_provider():
+                tools = self._get_rme_tools()
+                return ([tool.get("material") or None for tool in tools],
+                        [self._rme_spool_identifier(tool) for tool in tools])
+            if self._fallback_filaments is not None:
+                return self._fallback_filaments(), []
+            return [], []
+        except Exception as error:
+            self._logger.warning("Could not retrieve filament provider metadata: %s", error)
+            return [], []
+
     def allowed_to_print(self) -> Dict[str, Any]:
         """
         Check if the printer is allowed to print

@@ -77,10 +77,14 @@ class _Validator:
         self.result = result
         self.calls = 0
         self.last_check_cacheable = True
+        self.active_prompt = None
 
     def check_print(self, path):
         self.calls += 1
         return self.result
+
+    def get_active_prompt(self):
+        return self.active_prompt
 
 
 class _Printer:
@@ -155,8 +159,21 @@ class _SpoolmanPlugin:
         return _SpoolmanConnector()
 
 
+class _CombinedMetadataProvider:
+    def __init__(self):
+        self.calls = 0
+
+    def get_filament_metadata(self):
+        self.calls += 1
+        return ["PLA", "PETG"], ["first", "second"]
+
+
 class _RmeCompatibilityPlugin:
+    def __init__(self):
+        self.calls = 0
+
     def _filament_report(self):
+        self.calls += 1
         return {
             "schema": "rme-filament-report-v1",
             "provider": "internal",
@@ -319,6 +336,25 @@ class PreflightGateTests(unittest.TestCase):
         self.assertEqual("PLA", response["filamentType"])
         self.assertIsNone(response["spoolName"])
 
+    def test_all_extruder_rows_share_one_provider_snapshot(self):
+        plugin = self.make_plugin(True)
+        plugin.extruders = _FallbackExtruders()
+        plugin._spool_manager = _CombinedMetadataProvider()
+
+        rows = plugin._get_extruder_information(2)
+
+        self.assertEqual(1, plugin._spool_manager.calls)
+        self.assertEqual(["PLA", "PETG"], [row["filamentType"] for row in rows])
+        self.assertEqual(["first", "second"], [row["spoolName"] for row in rows])
+
+    def test_prompt_only_api_replays_active_prompt_without_loading_settings(self):
+        plugin = self.make_plugin(True)
+        plugin.validator.active_prompt = {"type": "validation_prompt", "msg": "Still waiting"}
+
+        response = plugin.on_api_command("get_active_prompt", {})
+
+        self.assertEqual(plugin.validator.active_prompt, response["active_prompt"])
+
     def test_spoolman_selected_spools_supply_materials_and_unique_names(self):
         integration = SpoolManagerIntegration(
             None, logging.getLogger("nfv-spoolman-tests"),
@@ -340,6 +376,18 @@ class PreflightGateTests(unittest.TestCase):
         self.assertEqual("rme_compatibility", integration.get_source_name())
         self.assertEqual(["PLA", "PETG"], integration.get_loaded_filaments())
         self.assertEqual(["rme:internal:4", None], integration.get_names())
+
+    def test_combined_rme_metadata_uses_one_report_snapshot(self):
+        rme_plugin = _RmeCompatibilityPlugin()
+        integration = SpoolManagerIntegration(
+            None, logging.getLogger("nfv-rme-snapshot-tests"),
+            rme_compatibility_impl=rme_plugin)
+
+        materials, names = integration.get_filament_metadata()
+
+        self.assertEqual(["PLA", "PETG"], materials)
+        self.assertEqual(["rme:internal:4", None], names)
+        self.assertEqual(1, rme_plugin.calls)
 
     def test_old_rme_plugin_without_report_keeps_manual_fallback_available(self):
         integration = SpoolManagerIntegration(

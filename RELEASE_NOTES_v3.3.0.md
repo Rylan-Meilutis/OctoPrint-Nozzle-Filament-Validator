@@ -1,4 +1,17 @@
-# Nozzle Filament Validator 3.3.0b2
+# Nozzle Filament Validator 3.3.0b3
+
+## OctoPrint UI performance
+
+- Removed NFV's unconditional settings-data request from normal OctoPrint page startup. NFV now
+  loads its settings data only when its own settings panel is visible.
+- Replaced the general request plus one request per extruder with one consolidated API response and
+  one filament-provider snapshot per redraw.
+- Added redraw request coalescing so repeated UI events cannot create overlapping settings loads.
+- Scoped and namespaced NFV's tab handler so settings redraws no longer accumulate handlers on
+  OctoPrint's persistent global navigation tabs.
+- Ignored NFV settings-reload messages while its settings panel is hidden. File validation prompts
+  and notifications remain active globally, with a lightweight prompt-only startup request retaining
+  prompt recovery after a browser reconnect.
 
 ## Early file validation
 

@@ -69,6 +69,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             update_extruder=["extruderPosition", "nozzleId"],
             get_extruder_info=["extruderId"],
             get_loaded_filaments=[],
+            get_active_prompt=[],
             updateWaitState=["state"],
             update_filament_timeout=["timeout"],
             update_check_spool_id_timeout=["timeout"],
@@ -102,6 +103,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         check_filament_type = str(self.filament.get_enable_filament_type_checking())
         spool_manager_available = self._spool_manager.is_available()
         filament_source = self._spool_manager.get_source_name()
+        extruder_information = self._get_extruder_information(number_of_extruders)
         active_prompt = self.validator.get_active_prompt()
         validate_on_upload = self._settings.get_boolean(["validate_on_upload"])
         return flask.jsonify(nozzles=nozzles, number_of_extruders=number_of_extruders,
@@ -112,8 +114,33 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                              check_filament_type=check_filament_type,
                              spool_manager_available=spool_manager_available,
                              filament_source=filament_source,
+                             extruders=extruder_information,
                              validate_on_upload=validate_on_upload,
                              active_prompt=active_prompt)
+
+    def _get_extruder_information(self, number_of_extruders: int) -> List[Dict]:
+        """Build every extruder row from one provider metadata snapshot."""
+        metadata_getter = getattr(self._spool_manager, "get_filament_metadata", None)
+        if callable(metadata_getter):
+            loaded_filaments, spool_names = metadata_getter()
+        else:
+            loaded_filaments = self._spool_manager.get_loaded_filaments()
+            spool_names = self._spool_manager.get_names()
+        if not isinstance(loaded_filaments, (list, tuple)):
+            loaded_filaments = []
+        if not isinstance(spool_names, (list, tuple)):
+            spool_names = []
+
+        result = []
+        for position in range(1, number_of_extruders + 1):
+            index = position - 1
+            result.append({
+                "nozzleSize": self.extruders.get_nozzle_size_for_extruder(position),
+                "extruderPosition": position,
+                "filamentType": loaded_filaments[index] if index < len(loaded_filaments) else None,
+                "spoolName": spool_names[index] if index < len(spool_names) else None,
+            })
+        return result
 
     def on_api_command(self, command: str, data: Dict) -> flask.response:
         """
@@ -124,6 +151,9 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         """
         if current_user.is_anonymous:
             return flask.abort(403)
+
+        if command == "get_active_prompt":
+            return flask.jsonify(active_prompt=self.validator.get_active_prompt())
 
         if command == "addNozzle":
             nozzle_size = data["size"]
@@ -237,18 +267,12 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             extruder_id = data.get("extruderId")
             if extruder_id is not None:
                 try:
-                    nozzle_size = self.extruders.get_nozzle_size_for_extruder(extruder_id)
-                    extruder_position = extruder_id
-                    try:
-                        filaments = self._spool_manager.get_loaded_filaments()[extruder_position - 1]
-                    except Exception as e:
-                        self._logger.error(f"Error retrieving filament info: {e}")
-                        filaments = None
-                    spool_names = self._spool_manager.get_names() or []
-                    spool_name = spool_names[extruder_position - 1] if extruder_position <= len(spool_names) else None
-                    return flask.jsonify(nozzleSize=nozzle_size, extruderPosition=extruder_position,
-                                         filamentType=filaments,
-                                         spoolName=spool_name)
+                    extruder_position = int(extruder_id)
+                    extruder_information = self._get_extruder_information(
+                        self.extruders.get_number_of_extruders())
+                    if extruder_position < 1 or extruder_position > len(extruder_information):
+                        return flask.abort(404)
+                    return flask.jsonify(**extruder_information[extruder_position - 1])
                 except Exception as e:
                     self.send_alert(f"Error retrieving extruder info: {e}", alert_types.tmp_error)
                     return flask.abort(500)
