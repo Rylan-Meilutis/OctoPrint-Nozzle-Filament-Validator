@@ -478,10 +478,12 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         if self.validator is None:
             raise RuntimeError("Nozzle Filament Validator is not initialized")
         with self._validation_lock:
-            self.validator.set_tool_mapping(mapping)
-            # The same path must be revalidated if its physical assignment
-            # changes between print attempts.
-            self._validation_result = None
+            mapping_changed = self.validator.set_tool_mapping(mapping)
+            if mapping_changed:
+                # The same path must be revalidated if its physical assignment
+                # changes between print attempts. Repeated publication of the
+                # already-confirmed mapping must not restart validation.
+                self._validation_result = None
 
     @staticmethod
     def _stable_value(value):

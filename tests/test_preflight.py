@@ -78,6 +78,7 @@ class _Validator:
         self.calls = 0
         self.last_check_cacheable = True
         self.active_prompt = None
+        self.mapping = {}
 
     def check_print(self, path):
         self.calls += 1
@@ -85,6 +86,13 @@ class _Validator:
 
     def get_active_prompt(self):
         return self.active_prompt
+
+    def set_tool_mapping(self, mapping):
+        normalized = {int(logical): int(physical) for logical, physical in mapping.items()}
+        if normalized == self.mapping:
+            return False
+        self.mapping = normalized
+        return True
 
 
 class _Printer:
@@ -235,6 +243,16 @@ class PreflightGateTests(unittest.TestCase):
                 comm, "queuing", "G28", None, "G28", tags={"source:file"}))
             self.assertEqual(1, plugin.validator.calls)
             self.assertEqual(0, plugin._printer.cancel_calls)
+
+    def test_repeated_confirmed_mapping_does_not_restart_validation(self):
+        plugin = self.make_plugin(True)
+        plugin.set_tool_mapping({2: 0})
+        self.assertIsNone(plugin._validation_result)
+
+        plugin._validation_result = True
+        plugin.set_tool_mapping({2: 0})
+
+        self.assertTrue(plugin._validation_result)
 
     def test_cached_success_is_reused_for_unchanged_file_and_config(self):
         with tempfile.TemporaryDirectory() as directory:

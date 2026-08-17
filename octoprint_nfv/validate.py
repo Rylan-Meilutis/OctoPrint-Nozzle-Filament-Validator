@@ -184,12 +184,15 @@ class validator:
         # physical tools. Identity is the safe default when RME is absent.
         self._tool_mapping = {}
 
-    def set_tool_mapping(self, mapping: Dict[int, int]) -> None:
+    def set_tool_mapping(self, mapping: Dict[int, int]) -> bool:
         """Set the confirmed logical-to-physical mapping for the next checks."""
         normalized = {int(logical): int(physical) for logical, physical in mapping.items()}
         if any(logical < 0 or physical < 0 for logical, physical in normalized.items()):
             raise ValueError("Tool mapping indices must be non-negative")
+        if normalized == self._tool_mapping:
+            return False
         self._tool_mapping = normalized
+        return True
 
     def physical_tool(self, logical_tool: int) -> int:
         """Resolve a slicer tool to the physical tool configured by RME."""
@@ -321,6 +324,15 @@ class validator:
         if missing_fields:
             return self.prompt_validation_override(
                 "Required slicer metadata is missing: " + ", ".join(missing_fields))
+
+        # A single-extruder multi-material printer has one physical nozzle but
+        # one filament/usage entry per logical tool. Normalize that valid
+        # slicer representation before comparing metadata lengths so every
+        # used logical tool is still validated against the shared nozzle.
+        if (semm and len(nozzles) == 1
+                and len(filament_types) == len(filament_used)
+                and len(filament_types) > 1):
+            nozzles = nozzles * len(filament_types)
 
         if not (len(nozzles) == len(filament_types) == len(filament_used)):
             return self.prompt_validation_override(

@@ -45,6 +45,14 @@ class _RemappedExtruders:
         return {1: 0.6, 2: 0.4}[position]
 
 
+class _FiveSharedNozzleExtruders:
+    def get_number_of_extruders(self):
+        return 5
+
+    def get_nozzle_size_for_extruder(self, position):
+        return 0.4
+
+
 class _SpoolManager:
     def get_loaded_filaments(self):
         return -1
@@ -74,6 +82,11 @@ class _TypesDisabledFilament(_Filament):
 class _WrongTypeSpoolManager:
     def get_loaded_filaments(self):
         return ["ABS"]
+
+
+class _FiveSlotSpoolManager:
+    def get_loaded_filaments(self):
+        return ["PLA", "PLA", "PETG", "PLA", "PLA"]
 
 
 class _ManualFilamentProvider:
@@ -243,6 +256,30 @@ class ValidatorTests(unittest.TestCase):
                 0, ["ABS", "PLA"], ["PLA"], {"filament_type": ["PLA"]}, True, False
             ),
         )
+
+    def test_semm_metadata_reuses_one_physical_nozzle_for_five_logical_tools(self):
+        self.validator.extruders = _FiveSharedNozzleExtruders()
+        self.validator._spool_manager = _FiveSlotSpoolManager()
+        self.validator.build_plate.is_filament_compatible_with_build_plate = (
+            lambda filament_type: filament_type in ("PLA", "PETG")
+        )
+        gcode = """; nozzle_diameter = 0.4
+; filament_type = PLA;PLA;PETG;PLA;PLA
+; filament used [mm] = 0.00,0.00,26929.21,0.00,0.00
+; printer_model = Test Printer
+; single_extruder_multi_material = 1
+T2
+"""
+
+        self.assertTrue(self.validator.check_print(self.write_gcode(gcode)))
+        self.assertTrue(self.validator.last_check_cacheable)
+        self.assertFalse(any("different tool counts" in message[1].get("msg", "")
+                             for message in self.plugin_manager.messages))
+
+    def test_repeating_identical_tool_mapping_is_not_a_change(self):
+        self.assertTrue(self.validator.set_tool_mapping({2: 0}))
+        self.assertFalse(self.validator.set_tool_mapping({2: 0}))
+        self.assertTrue(self.validator.set_tool_mapping({2: 1}))
 
 
 if __name__ == "__main__":
