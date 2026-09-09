@@ -49,6 +49,9 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         self._validation_jobs = set()
         self._validation_jobs_lock = threading.Lock()
 
+    def is_api_protected(self) -> bool:
+        return True
+
     def get_api_commands(self):
         """
         Get the API commands for the plugin
