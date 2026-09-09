@@ -98,7 +98,9 @@ function updateSpool(dbID, extruderPos) {
     }).fail(function (data) {
         new PNotify({
             title: 'SpoolManager Error',
+            title_escape: true,
             text: 'Failed to select spool:' + data.responseText,
+            text_escape: true,
             type: 'error',
             hide: false,
             closer: true,
@@ -127,7 +129,9 @@ function get_spools() {
         }).fail(function (data) {
             new PNotify({
                 title: 'SpoolManager Error',
+                title_escape: true,
                 text: 'Failed to get spools:' + data.responseText,
+                text_escape: true,
                 type: 'error',
                 hide: false,
                 closer: true,
