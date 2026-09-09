@@ -803,7 +803,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 __plugin_name__ = "Nozzle Filament Validator"
 
 # specify the plugin's python compatibility
-__plugin_pythoncompat__ = ">=3,<4"  # Only Python 3
+__plugin_pythoncompat__ = ">=3.7,<4"
 
 
 def __plugin_load__() -> None:
