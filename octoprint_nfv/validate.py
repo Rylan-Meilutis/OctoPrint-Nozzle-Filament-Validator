@@ -459,7 +459,7 @@ class validator:
             if remove_mmu_from_end(self.get_printer_model().lower()).endswith("is"):
                 if not remove_mmu_from_end(printer_model.lower()).endswith("is"):
                     self.send_alert(
-                        f"Printing with non InputShaping profile on a printer that supports input shaping",
+                        "Printing with non InputShaping profile on a printer that supports input shaping",
                         alert_types.info)
 
             if remove_is_from_end(self.get_printer_model().lower()) != printer_model.lower():

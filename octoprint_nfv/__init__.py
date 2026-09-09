@@ -18,7 +18,7 @@ import octoprint_nfv.extruders as extruders
 import octoprint_nfv.nozzle as nozzle
 import octoprint_nfv.validate as validate
 from octoprint_nfv.constants import alert_types
-from octoprint_nfv.db import get_db, init_db
+from octoprint_nfv.db import add_row_to_db, check_and_insert_to_db, get_db, init_db
 from octoprint_nfv.filament import filament
 from octoprint_nfv.spoolManager import SpoolManagerIntegration
 
@@ -38,7 +38,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         Constructor
         """
         super().__init__()
-        self._spool_manager: spoolManager = None
+        self._spool_manager: SpoolManagerIntegration = None
         self.nozzle: validate = None
         self.build_plate: build_plate = None
         self.extruders: extruders = None
@@ -420,18 +420,18 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                                             self._printer_profile_manager)
 
         # Check if the nozzle and build plate columns exist in the current_selections table
-        db.check_and_insert_to_db(self.get_plugin_data_folder(), self._logger, "build_plate")
+        check_and_insert_to_db(self.get_plugin_data_folder(), self._logger, "build_plate")
 
         # Add default nozzle and build plate to the database
-        db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "nozzles", self.nozzle.add_nozzle_to_database,
-                         (0.4,))
-        db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "build_plates",
-                         self.build_plate.insert_build_plate_to_database, ("Generic", "PLA, PETG, ABS", "1"))
+        add_row_to_db(self.get_plugin_data_folder(), self._logger, "nozzles", self.nozzle.add_nozzle_to_database,
+                      (0.4,))
+        add_row_to_db(self.get_plugin_data_folder(), self._logger, "build_plates",
+                      self.build_plate.insert_build_plate_to_database, ("Generic", "PLA, PETG, ABS", "1"))
 
-        db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "extruders",
-                         self.extruders.add_extruder_to_database, (1, 1))
-        db.add_row_to_db(self.get_plugin_data_folder(), self._logger, "filament_data",
-                         self.filament.initial_db_add, (False, 300, True), 3)
+        add_row_to_db(self.get_plugin_data_folder(), self._logger, "extruders",
+                      self.extruders.add_extruder_to_database, (1, 1))
+        add_row_to_db(self.get_plugin_data_folder(), self._logger, "filament_data",
+                      self.filament.initial_db_add, (False, 300, True), 3)
 
         self.extruders.update_data()
         conn.close()
