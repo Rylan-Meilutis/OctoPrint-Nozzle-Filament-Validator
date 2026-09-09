@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import logging
-from typing import List, Optional
 
 from octoprint_nfv import db
 
@@ -140,7 +141,7 @@ class filament:
         self._add_setting(f"manual_filament_{extruder_position}", filament_type)
         self._update_setting(f"manual_filament_{extruder_position}", filament_type)
 
-    def get_manual_filaments(self, extruder_count: int) -> List[Optional[str]]:
+    def get_manual_filaments(self, extruder_count: int) -> list[str | None]:
         """Return one fallback material entry per configured extruder."""
         con = db.get_db(self.data_folder)
         cursor = con.cursor()

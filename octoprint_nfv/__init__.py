@@ -1,11 +1,9 @@
-# coding=utf-8
-from __future__ import absolute_import, annotations
+from __future__ import annotations
 
 import hashlib
 import json
 import os
 import threading
-from typing import Dict, List
 
 import flask
 import octoprint.plugin
@@ -118,7 +116,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
                              validate_on_upload=validate_on_upload,
                              active_prompt=active_prompt)
 
-    def _get_extruder_information(self, number_of_extruders: int) -> List[Dict]:
+    def _get_extruder_information(self, number_of_extruders: int) -> list[dict]:
         """Build every extruder row from one provider metadata snapshot."""
         metadata_getter = getattr(self._spool_manager, "get_filament_metadata", None)
         if callable(metadata_getter):
@@ -142,7 +140,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             })
         return result
 
-    def on_api_command(self, command: str, data: Dict) -> flask.response:
+    def on_api_command(self, command: str, data: dict) -> flask.response:
         """
         Handle the API commands from the frontend
         :param command: the command to handle
@@ -473,7 +471,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             self.extruders.update_data()
             self.send_alert("", "reload")
 
-    def set_tool_mapping(self, mapping: Dict[int, int]) -> None:
+    def set_tool_mapping(self, mapping: dict[int, int]) -> None:
         """Receive RME's confirmed mapping before preflight validation runs."""
         if self.validator is None:
             raise RuntimeError("Nozzle Filament Validator is not initialized")
@@ -521,7 +519,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def _file_signature(path: str) -> Dict[str, int]:
+    def _file_signature(path: str) -> dict[str, int]:
         stat = os.stat(path)
         return {
             "size": stat.st_size,
@@ -536,7 +534,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             return None
 
     def _write_validation_cache(self, disk_path: str, storage_path: str,
-                                file_signature: Dict[str, int], config_hash: str) -> None:
+                                file_signature: dict[str, int], config_hash: str) -> None:
         record = {"version": 1, "file": file_signature, "config": config_hash}
         normalized_path = os.path.realpath(disk_path)
         self._validation_cache[normalized_path] = record
@@ -723,7 +721,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     # ~~ TemplatePlugin mixin
 
-    def get_template_configs(self) -> List[Dict[str, str | bool]]:
+    def get_template_configs(self) -> list[dict[str, str | bool]]:
         """
         get the html templete for the plugin
         :return: the html template
@@ -735,7 +733,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
     # ~~ AssetPlugin mixin
 
-    def get_assets(self) -> Dict[str, List[str]]:
+    def get_assets(self) -> dict[str, list[str]]:
         """
         returns the web assets for the plugin
         :return: the web assets

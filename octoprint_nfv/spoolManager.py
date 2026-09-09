@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import json
 import logging
 import threading
 import time
-from typing import Any, List, Dict, Union
+from typing import Any
 
 from octoprint.server import app
 
@@ -45,7 +47,7 @@ class SpoolManagerIntegration:
             return "rme_compatibility"
         return "manual"
 
-    def _get_rme_tools(self) -> List[Dict[str, Any]]:
+    def _get_rme_tools(self) -> list[dict[str, Any]]:
         """Return RME Compatibility's provider-neutral per-tool loadout."""
         if self._rme_compatibility_impl is None:
             return []
@@ -67,7 +69,7 @@ class SpoolManagerIntegration:
             return []
 
     @staticmethod
-    def _rme_spool_identifier(tool: Dict[str, Any]) -> Union[str, None]:
+    def _rme_spool_identifier(tool: dict[str, Any]) -> str | None:
         """Build a stable name-validation value for an inventory-backed RME tool."""
         spool_id = tool.get("spool_id")
         if spool_id in (None, ""):
@@ -75,7 +77,7 @@ class SpoolManagerIntegration:
         provider = str(tool.get("provider") or "internal").strip().lower().replace(" ", "-")
         return f"rme:{provider}:{spool_id}"
 
-    def _get_spoolman_selected_spools(self) -> List[Union[Dict[str, Any], None]]:
+    def _get_spoolman_selected_spools(self) -> list[dict[str, Any] | None]:
         """Return Spoolman's selected spool object for each zero-based tool."""
         if self._spoolman_impl is None:
             return []
@@ -111,7 +113,7 @@ class SpoolManagerIntegration:
             self._logger.warning("Skipping Spoolman assignment due to integration error: %s", error)
             return []
 
-    def get_materials(self) -> List[str]:
+    def get_materials(self) -> list[str]:
         """
         Get the materials from the Spool Manager
         :return:
@@ -169,7 +171,7 @@ class SpoolManagerIntegration:
             self._logger.warning("Could not retrieve filament provider metadata: %s", error)
             return [], []
 
-    def allowed_to_print(self) -> Dict[str, Any]:
+    def allowed_to_print(self) -> dict[str, Any]:
         """
         Check if the printer is allowed to print
         :return: the response from the Spool Manager
@@ -182,7 +184,7 @@ class SpoolManagerIntegration:
             )
         return json.loads(r.data)
 
-    def start_print_confirmed(self) -> Dict[str, Any]:
+    def start_print_confirmed(self) -> dict[str, Any]:
         """
         Start of a print job confirmed
         :return: information about the print job
@@ -195,7 +197,7 @@ class SpoolManagerIntegration:
             )
         return json.loads(r.data)
 
-    def get_loaded_filament(self) -> Union[str, None]:
+    def get_loaded_filament(self) -> str | None:
         """
         Get the currently loaded filament
         :return: the currently loaded filament
@@ -212,7 +214,7 @@ class SpoolManagerIntegration:
             self._logger.error(f"Error retrieving loaded filament: {e}")
             return None
 
-    def get_loaded_filaments(self) -> Union[List[str], int, None]:
+    def get_loaded_filaments(self) -> list[str] | int | None:
         """
         Get the currently loaded filaments
         :return: a list of the currently loaded filaments
@@ -251,7 +253,7 @@ class SpoolManagerIntegration:
             self._logger.error(f"Error retrieving loaded filament: {e}")
             return -2
 
-    def get_names(self) -> Union[List[str], None]:
+    def get_names(self) -> list[str] | None:
         """
         Get the name of the spools
         :return: the name of the spool
@@ -284,7 +286,7 @@ class SpoolManagerIntegration:
             )
             return []
 
-    def get_db_id(self) -> Union[List[str], None]:
+    def get_db_id(self) -> list[str] | None:
         """
         Get the database id's of the spools
         :return: the db_id's of the spool
