@@ -731,6 +731,9 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
             # page
         ]
 
+    def is_template_autoescaped(self) -> bool:
+        return True
+
     # ~~ AssetPlugin mixin
 
     def get_assets(self) -> dict[str, list[str]]:
