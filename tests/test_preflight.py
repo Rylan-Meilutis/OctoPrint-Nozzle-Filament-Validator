@@ -56,20 +56,8 @@ from octoprint_nfv.filament import filament
 from octoprint_nfv.spoolManager import SpoolManagerIntegration
 
 
-class _CurrentFile:
-    def __init__(self, path):
-        self.path = path
-
-    def getFilename(self):
-        return self.path
-
-
 class _Comm:
-    def __init__(self, path):
-        self._currentFile = _CurrentFile(path)
-
-    def isSdFileSelected(self):
-        return False
+    pass
 
 
 class _Validator:
@@ -98,6 +86,10 @@ class _Validator:
 class _Printer:
     def __init__(self):
         self.cancel_calls = 0
+        self.job = {}
+
+    def select(self, path, origin="local"):
+        self.job = {"file": {"path": path, "origin": origin}}
 
     def cancel_print(self):
         self.cancel_calls += 1
@@ -107,7 +99,7 @@ class _Printer:
         return self.cancel_calls >= 2
 
     def get_current_job(self):
-        return {}
+        return self.job
 
 
 class _FileManager:
@@ -210,8 +202,9 @@ class PreflightGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = str(Path(directory) / "print.gcode")
             Path(path).write_text("G28\n", encoding="utf-8")
-            comm = _Comm(path)
             plugin = self.make_plugin(False)
+            plugin._printer.select(path)
+            comm = _Comm()
 
             start_result = plugin.validate_before_queuing(
                 comm, "queuing", "M110 N0", None, "M110", tags={"source:job"})
@@ -226,7 +219,7 @@ class PreflightGateTests(unittest.TestCase):
     def test_cancellation_commands_are_not_suppressed(self):
         plugin = self.make_plugin(False)
         result = plugin.validate_before_queuing(
-            _Comm("print.gcode"), "queuing", "M400", None, "M400",
+            _Comm(), "queuing", "M400", None, "M400",
             tags={"source:job", "trigger:cancel"})
         self.assertIsNone(result)
         self.assertEqual(0, plugin.validator.calls)
@@ -236,7 +229,8 @@ class PreflightGateTests(unittest.TestCase):
             path = str(Path(directory) / "print.gcode")
             Path(path).write_text("G28\n", encoding="utf-8")
             plugin = self.make_plugin(True)
-            comm = _Comm(path)
+            plugin._printer.select(path)
+            comm = _Comm()
             self.assertIsNone(plugin.validate_before_queuing(
                 comm, "queuing", "M110 N0", None, "M110", tags={"source:job"}))
             self.assertIsNone(plugin.validate_before_queuing(
@@ -261,9 +255,10 @@ class PreflightGateTests(unittest.TestCase):
             plugin = self.make_plugin(True)
 
             self.assertTrue(plugin._validate_and_cache(path, path))
+            plugin._printer.select(path)
             plugin._validation_cache.clear()  # Exercise persistent file metadata too.
             self.assertIsNone(plugin.validate_before_queuing(
-                _Comm(path), "queuing", "G28", None, "G28", tags={"source:file"}))
+                _Comm(), "queuing", "G28", None, "G28", tags={"source:file"}))
 
             self.assertEqual(1, plugin.validator.calls)
 
@@ -274,9 +269,10 @@ class PreflightGateTests(unittest.TestCase):
             plugin = self.make_plugin(True)
             self.assertTrue(plugin._validate_and_cache(path, path))
 
+            plugin._printer.select(path)
             plugin.config_hash = "config-b"
             self.assertIsNone(plugin.validate_before_queuing(
-                _Comm(path), "queuing", "G28", None, "G28", tags={"source:file"}))
+                _Comm(), "queuing", "G28", None, "G28", tags={"source:file"}))
 
             self.assertEqual(2, plugin.validator.calls)
 
@@ -287,9 +283,10 @@ class PreflightGateTests(unittest.TestCase):
             plugin = self.make_plugin(True)
             self.assertTrue(plugin._validate_and_cache(path, path))
 
+            plugin._printer.select(path)
             Path(path).write_text("G28\nM117 changed\n", encoding="utf-8")
             self.assertIsNone(plugin.validate_before_queuing(
-                _Comm(path), "queuing", "G28", None, "G28", tags={"source:file"}))
+                _Comm(), "queuing", "G28", None, "G28", tags={"source:file"}))
 
             self.assertEqual(2, plugin.validator.calls)
 

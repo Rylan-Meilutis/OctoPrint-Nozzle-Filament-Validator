@@ -652,21 +652,8 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
         thread.start()
         return True
 
-    def _get_selected_file_path(self, comm_instance=None):
+    def _get_selected_file_path(self):
         """Return the selected local job's absolute path, when available."""
-        # During a select-and-print request the state monitor can still contain
-        # the previously selected path. The comm layer is authoritative at the
-        # point where it queues this job's first command.
-        current_file = getattr(comm_instance, "_currentFile", None)
-        is_sd_file_selected = getattr(comm_instance, "isSdFileSelected", None)
-        is_sd_file = bool(is_sd_file_selected and is_sd_file_selected())
-        if is_sd_file:
-            return None
-        if current_file is not None:
-            filename = current_file.getFilename()
-            if filename:
-                return filename
-
         job = self._printer.get_current_job() or {}
         file_info = job.get("file") or {}
         path = file_info.get("path")
@@ -688,7 +675,7 @@ class Nozzle_filament_validatorPlugin(octoprint.plugin.StartupPlugin, octoprint.
 
         with self._validation_lock:
             try:
-                path = self._get_selected_file_path(comm_instance)
+                path = self._get_selected_file_path()
             except Exception:
                 self._logger.exception("Could not resolve the selected GCODE path")
                 path = None
