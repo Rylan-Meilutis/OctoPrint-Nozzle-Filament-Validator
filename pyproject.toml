@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "OctoPrint-Nozzle-Filament-Validator"
-version = "3.3.0b4"
+version = "3.3.0"
 description = "Validate nozzle size, build plate, and filament type before starting a print."
 authors = [
     { name = "Rylan Meilutis", email = "rylan.meilutis@gmail.com" },

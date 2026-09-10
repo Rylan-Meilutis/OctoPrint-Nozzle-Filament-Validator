@@ -1,4 +1,14 @@
-# Nozzle Filament Validator 3.3.0b3
+# Nozzle Filament Validator 3.3.0
+
+## OctoPrint 2.0 compatibility and security
+
+- Removed deprecated OctoPrint and Python integration patterns that generated warnings on
+  OctoPrint 2.0, including private communication-layer access.
+- Declared protected API access and template autoescaping explicitly for current OctoPrint
+  releases.
+- Escaped dynamic PNotify content to prevent user-controlled filament, spool, and validation data
+  from being rendered as HTML.
+- Migrated package metadata to `pyproject.toml` and clarified support for Python 3.7 through 3.x.
 
 ## OctoPrint UI performance
 
