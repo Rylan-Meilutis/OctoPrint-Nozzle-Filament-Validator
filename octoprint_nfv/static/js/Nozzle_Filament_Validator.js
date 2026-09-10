@@ -298,7 +298,9 @@ $(function () {
                     if (!response.started) {
                         new PNotify({
                             title: "Nozzle Filament Validator",
+                            title_escape: true,
                             text: "That file is already being validated.",
+                            text_escape: true,
                             type: "info",
                             hide: true
                         });
@@ -306,7 +308,9 @@ $(function () {
                 }).fail(function () {
                     new PNotify({
                         title: "Nozzle Filament Validator",
+                        title_escape: true,
                         text: "The selected local file could not be validated.",
+                        text_escape: true,
                         type: "error",
                         hide: false
                     });
@@ -359,10 +363,10 @@ $(function () {
             if (data.type === "validation_prompt") {
                 let resolved = false;
                 let timeout = Math.max(0, Number(data.timeout) || 0);
-                let safeMessage = $('<div>').text(data.msg).html();
                 new PNotify({
                     title: 'Print validation warning',
-                    text: safeMessage + '<br><br>Continue with this print anyway?',
+                    title_escape: true,
+                    text: _.escape(data.msg) + '<br><br>Continue with this print anyway?',
                     type: 'error',
                     icon: 'fas fa-exclamation-triangle',
                     hide: timeout > 0,
@@ -434,8 +438,10 @@ $(function () {
                     if (desiredDbId === undefined) {
                         new PNotify({
                             title: 'Spool Mismatch Detected',
+                            title_escape: true,
                             text: 'The spool specified in the gcode (name: ' + desiredName + ') does not match the spool ' +
                                 'loaded in Spool Manager (name: ' + currentName + '). The desired spool was not found. Which of the following is true?',
+                            text_escape: true,
                             icon: 'fas fa-question-circle',
                             hide: true,
                             delay: Number(timeout) * 1000,
@@ -492,8 +498,10 @@ $(function () {
 
                     new PNotify({
                         title: 'Spool Mismatch Detected',
+                        title_escape: true,
                         text: 'The spool specified in the gcode (name: ' + desiredName + ') does not match the spool ' +
                             'loaded in Spool Manager (name: ' + currentName + '). Which of the following is true?',
+                        text_escape: true,
                         icon: 'fas fa-question-circle',
                         hide: true,
                         delay: Number(timeout) * 1000,
@@ -602,7 +610,8 @@ $(function () {
             if (data.msg !== "") {
                 new PNotify({
                     title: 'Nozzle Filament Validator',
-                    text: data.msg,
+                    title_escape: true,
+                    text: _.escape(data.msg).replace(/\n/g, '<br />'),
                     type: theme,
                     hide: data.type === 'info' || data.type === 'tmp_error' || data.type === 'tmp_danger' || data.type === 'success',
                     buttons: {closer: true, sticker: false}

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 import sqlite3
@@ -29,7 +31,7 @@ def init_db(path: str) -> None:
     sql_file = os.path.join(os.path.dirname(__file__), "schema.sql")
     try:
         # Read SQL file
-        with open(sql_file, 'r') as file:
+        with open(sql_file) as file:
             sql_script = file.read()
     except FileNotFoundError:
         return

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import logging
-from typing import Any, List, Dict
+from typing import Any
 
 from octoprint_nfv.db import get_db
 
@@ -19,7 +21,7 @@ class nozzle:
         self.data_folder = data_folder
         self._logger = logger
 
-    def fetch_nozzles_from_database(self) -> List[Dict[str, Any]]:
+    def fetch_nozzles_from_database(self) -> list[dict[str, Any]]:
         """
         Fetch all nozzles from the database
         :return: a list of all available nozzles
