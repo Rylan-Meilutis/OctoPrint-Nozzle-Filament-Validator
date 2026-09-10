@@ -2,15 +2,8 @@ const PLUGIN_ID = "Nozzle_Filament_Validator";
 let activeTabId = "";
 let validatorMessageHandler = null;
 let activePromptKey = null;
-
-/**
- * Function to sleep for a given time in ms
- * @param time the time to sleep in ms
- * @returns {Promise<unknown>}
- */
-function sleep(time) {
-    return new Promise(resolve => setTimeout(resolve, time));
-}
+let displayDataRequest = null;
+let displayDataPending = false;
 
 // Function to fetch and display general information
 /**
@@ -107,14 +100,43 @@ function createExtruderTabs(extrudersArray, response) {
             </div>
             
             <hr>
+            ${response.spool_manager_available ? '' : `
+            <div class="alert alert-info">
+                <strong>No supported spool plugin is installed.</strong> Install
+                <a href="https://plugins.octoprint.org/plugins/SpoolManager/" target="_blank" rel="noopener">SpoolManager</a>
+                or <a href="https://plugins.octoprint.org/plugins/Spoolman/" target="_blank" rel="noopener">Spoolman</a>
+                or RME Compatibility
+                to validate filament/spool names. You can select the loaded material for each extruder below so
+                filament-type validation still works without it.
+            </div>`}
+            ${response.filament_source === 'spoolman' ? `
+            <div class="alert alert-info">
+                <strong>Using Spoolman.</strong> Selected spool materials are used for filament-type validation.
+                For optional spool-name validation, use the identifier shown for each extruder, such as
+                <code>[sm_name = spoolman:123]</code>, in the slicer's filament notes.
+            </div>` : ''}
+            ${response.filament_source === 'rme_compatibility' ? `
+            <div class="alert alert-info">
+                <strong>Using RME Compatibility.</strong> Its per-tool filament report supplies loaded materials.
+                Inventory-backed tools also expose an identifier such as
+                <code>[sm_name = rme:internal:4]</code>; firmware-only loadouts do not have a unique spool identity.
+            </div>` : ''}
             <!-- Checkbox to set check_spool_id -->
             <div class="form-group">
-                <input type="checkbox" id="check-spool-id-checkbox" ${response.check_spool_id === "True" ? 'checked' : ''}>
+                <input type="checkbox" id="check-spool-id-checkbox"
+                    ${response.check_spool_id === "True" && response.spool_manager_available ? 'checked' : ''}
+                    ${response.spool_manager_available ? '' : 'disabled'}>
                 <label for="check-spool-id-checkbox">Validate filament/spool names</label>
             </div>
             <div class="form-group">
                 <input type="checkbox" id="check-filament-type-checkbox" ${response.check_filament_type === "True" ? 'checked' : ''}>
                 <label for="check-filament-type-checkbox">Validate filament types</label>
+            </div>
+            <div class="form-group">
+                <input type="checkbox" id="validate-on-upload-checkbox" ${response.validate_on_upload ? 'checked' : ''}>
+                <label for="validate-on-upload-checkbox">Validate local G-code files when uploaded</label>
+                <p>A successful result is reused at print start only while both the file and current printer
+                configuration remain unchanged.</p>
             </div>
             <!-- Input field to set check_spool_id_timeout -->
             <div class="form-group">
@@ -138,7 +160,27 @@ function createExtruderTabs(extrudersArray, response) {
         let extruderNozzleSize = extruder.nozzleSize || "Nozzle size not available";
         let extruderFilamentType = extruder.filamentType || "Filament type not available";
         let extruderFilamentName = extruder.spoolName || "Filament DB ID not available";
+        let spoolNameLabel = response.filament_source === "spoolman" ? "Spoolman Identifier" :
+            (response.filament_source === "rme_compatibility" ? "RME Spool Identifier" : "Spool Name");
         let check_spool_id = response.check_spool_id === "True";
+        let manualFilamentSelector = "";
+        if (!response.spool_manager_available) {
+            let options = (response.filaments || []).map(function (filamentType) {
+                let selected = filamentType === extruderFilamentType ? " selected" : "";
+                return `<option value="${filamentType}"${selected}>${filamentType}</option>`;
+            }).join("");
+            manualFilamentSelector = `
+                <hr>
+                <label for="manual-filament-${extruderPosition}">Loaded filament on extruder ${extruderPosition}
+                    (${extruderNozzleSize} mm nozzle):</label>
+                <select id="manual-filament-${extruderPosition}" class="form-control manual-filament-select"
+                        data-extruder-position="${extruderPosition}">
+                    <option value="">Select a filament</option>
+                    ${options}
+                </select>
+                <button class="btn btn-success save-manual-filament"
+                        data-extruder-position="${extruderPosition}">Set Loaded Filament</button>`;
+        }
 
         $('#myTabs').append(`
             <li class="nav-item" id="#extruder-${extruderPosition}">
@@ -151,7 +193,7 @@ function createExtruderTabs(extrudersArray, response) {
             <div class="tab-pane" id="extruder-${extruderPosition}">
                 <div>
                     <strong>Filament Type: </strong><span>${extruderFilamentType}</span><br>
-                    <strong>Spool Name: </strong><span>"${extruderFilamentName}"</span>&nbsp;&nbsp;
+                    <strong>${spoolNameLabel}: </strong><span>"${extruderFilamentName}"</span>&nbsp;&nbsp;
                     <button id="refresh-filament-button" class="btn btn-info">Refresh</button>
                     ${check_spool_id && extruderFilamentName !== "Filament DB ID not available" ? '<p>To setup this spool in your slicer, you need to add the following line into ' +
             'the notes setting of your filament <code>[sm_name = ' + extruderFilamentName + ']</code><br>(Note: you cannot have brackets [] in the name of your filament.)</p>' : ''}
@@ -162,6 +204,7 @@ function createExtruderTabs(extrudersArray, response) {
                     <select id="nozzle-dropdown-${extruderPosition}" class="form-control" ${nozzleDropdownDisabled}>
                     </select>
                     <button id="select-nozzle-button-${extruderPosition}" class="btn btn-success">Select Nozzle</button>
+                    ${manualFilamentSelector}
                 </div>
             </div>
         `);
@@ -189,8 +232,10 @@ function createExtruderTabs(extrudersArray, response) {
 
     }
 
-    // Event listener for the tab show event to update the activeTabId variable
-    $('a[data-toggle="tab"]').on('show.bs.tab', function (e) {
+    // Namespace and replace this plugin's handler so redraws cannot accumulate
+    // listeners on OctoPrint's persistent navigation tabs.
+    $('#myTabs').off('show.bs.tab.nfv', 'a[data-toggle="tab"]');
+    $('#myTabs').on('show.bs.tab.nfv', 'a[data-toggle="tab"]', function (e) {
         let data = e.target.getAttribute("href").slice(1);
         //check if data isn't blank and is a child of the extruder-tabs div
         if (data !== "" && $(`#${data}`).parent().attr('id') === "extruder-tabs") {
@@ -199,58 +244,37 @@ function createExtruderTabs(extrudersArray, response) {
     });
 }
 
-// Function to fetch extruder information
-/**
- * Fetches extruder information for the given number of extruders
- * @param numberOfExtruders The number of extruders to fetch information for
- * @returns {Promise<Awaited<Promise>[]>}
- */
-function fetchExtruderInfo(numberOfExtruders) {
-    let promises = [];
-
-    for (let i = 0; i < numberOfExtruders; i++) {
-        let promise = new Promise((resolve, reject) => {
-            OctoPrint.simpleApiCommand(PLUGIN_ID, "get_extruder_info", {"extruderId": i + 1})
-                .done(function (response) {
-                    resolve(response);
-                }).fail(function (error) {
-                new PNotify({
-                    title: 'Extruder Error',
-                    text: 'Failed to fetch extruder information for extruder ' + (i + 1) + '.',
-                    type: 'error',
-                    hide: false
-                });
-                reject(error);
-            });
-        });
-        promises.push(promise);
-    }
-    return Promise.all(promises);
-}
-
 // Main function to display data
 /**
  * Function to update the display window with the latest data
  */
-function displayData() {
-    OctoPrint.simpleApiGet(PLUGIN_ID).done(function (response) {
+function displayData(queueIfBusy) {
+    if (displayDataRequest) {
+        if (queueIfBusy !== false) {
+            displayDataPending = true;
+        }
+        return;
+    }
+    displayDataRequest = OctoPrint.simpleApiGet(PLUGIN_ID).done(function (response) {
         if (response.active_prompt && validatorMessageHandler) {
             validatorMessageHandler(PLUGIN_ID, response.active_prompt);
         }
-        fetchExtruderInfo(response.number_of_extruders)
-            .then((responses) => {
-                let extruderArray = responses;
-                extruderArray.sort((a, b) => (a.extruderPosition > b.extruderPosition) ? 1 : -1);
-                createExtruderTabs(extruderArray, response);
-                displayGeneralInfo(response);
-                activate_nozzle_buttons(response);
-                activate_build_plate_buttons(response);
-                activate_extruder_buttons(response);
-                setRefreshButtons();
-
-            }).catch((error) => {
-            console.error("Error fetching extruder info:", error);
-        });
+        let extruderArray = response.extruders || [];
+        extruderArray.sort((a, b) => (a.extruderPosition > b.extruderPosition) ? 1 : -1);
+        createExtruderTabs(extruderArray, response);
+        displayGeneralInfo(response);
+        activate_nozzle_buttons(response);
+        activate_build_plate_buttons(response);
+        activate_extruder_buttons(response);
+        setRefreshButtons();
+    }).fail(function (error) {
+        console.error("Error fetching Nozzle Filament Validator settings:", error);
+    }).always(function () {
+        displayDataRequest = null;
+        if (displayDataPending) {
+            displayDataPending = false;
+            displayData();
+        }
     });
 }
 
@@ -259,7 +283,59 @@ $(function () {
     /**
      * this function is called when the plugin receives a message from the server
      */
-    function messageHandler() {
+    function messageHandler(parameters) {
+        let filesViewModel = parameters[2];
+
+        if (filesViewModel) {
+            filesViewModel.validateWithNozzleFilamentValidator = function (file) {
+                if (!file || file.origin !== "local" || !file.path) {
+                    return;
+                }
+                OctoPrint.simpleApiCommand(PLUGIN_ID, "validate_file", {
+                    path: file.path,
+                    origin: file.origin
+                }).done(function (response) {
+                    if (!response.started) {
+                        new PNotify({
+                            title: "Nozzle Filament Validator",
+                            title_escape: true,
+                            text: "That file is already being validated.",
+                            text_escape: true,
+                            type: "info",
+                            hide: true
+                        });
+                    }
+                }).fail(function () {
+                    new PNotify({
+                        title: "Nozzle Filament Validator",
+                        title_escape: true,
+                        text: "The selected local file could not be validated.",
+                        text_escape: true,
+                        type: "error",
+                        hide: false
+                    });
+                });
+            };
+
+            // Extend OctoPrint's machine-code row before Knockout instantiates it.
+            // This avoids replacing the core files view model or duplicating its template.
+            let machinecodeTemplate = $("#files_template_machinecode");
+            let templateHtml = machinecodeTemplate.html();
+            if (templateHtml && templateHtml.indexOf("btn-nfv-validate") === -1) {
+                let selectButton = templateHtml.indexOf("btn-files-select");
+                let insertionPoint = selectButton === -1 ? -1 : templateHtml.lastIndexOf("<", selectButton);
+                let validateButton = '<div class="btn btn-mini btn-nfv-validate" ' +
+                    'data-bind="visible: origin === \'local\' && $root.loginState.isUser(), ' +
+                    'click: function() { $root.validateWithNozzleFilamentValidator($data); }" ' +
+                    'title="Validate for current configuration" aria-label="Validate for current configuration" ' +
+                    'role="link"><i class="fas fa-check-circle"></i></div>';
+                if (insertionPoint !== -1) {
+                    machinecodeTemplate.html(templateHtml.slice(0, insertionPoint) + validateButton +
+                        templateHtml.slice(insertionPoint));
+                }
+            }
+        }
+
         /**
          * This function is called when the plugin receives a message from the server
          * @param plugin The plugin that sent the message
@@ -270,7 +346,9 @@ $(function () {
                 return;
             }
             if (data.type === "reload") {
-                displayData();
+                if ($('.nozzle-filament-validator:visible').length) {
+                    displayData();
+                }
                 return;
             }
 
@@ -285,10 +363,10 @@ $(function () {
             if (data.type === "validation_prompt") {
                 let resolved = false;
                 let timeout = Math.max(0, Number(data.timeout) || 0);
-                let safeMessage = $('<div>').text(data.msg).html();
                 new PNotify({
                     title: 'Print validation warning',
-                    text: safeMessage + '<br><br>Continue with this print anyway?',
+                    title_escape: true,
+                    text: _.escape(data.msg) + '<br><br>Continue with this print anyway?',
                     type: 'error',
                     icon: 'fas fa-exclamation-triangle',
                     hide: timeout > 0,
@@ -360,8 +438,10 @@ $(function () {
                     if (desiredDbId === undefined) {
                         new PNotify({
                             title: 'Spool Mismatch Detected',
+                            title_escape: true,
                             text: 'The spool specified in the gcode (name: ' + desiredName + ') does not match the spool ' +
                                 'loaded in Spool Manager (name: ' + currentName + '). The desired spool was not found. Which of the following is true?',
+                            text_escape: true,
                             icon: 'fas fa-question-circle',
                             hide: true,
                             delay: Number(timeout) * 1000,
@@ -418,8 +498,10 @@ $(function () {
 
                     new PNotify({
                         title: 'Spool Mismatch Detected',
+                        title_escape: true,
                         text: 'The spool specified in the gcode (name: ' + desiredName + ') does not match the spool ' +
                             'loaded in Spool Manager (name: ' + currentName + '). Which of the following is true?',
+                        text_escape: true,
                         icon: 'fas fa-question-circle',
                         hide: true,
                         delay: Number(timeout) * 1000,
@@ -528,7 +610,8 @@ $(function () {
             if (data.msg !== "") {
                 new PNotify({
                     title: 'Nozzle Filament Validator',
-                    text: data.msg,
+                    title_escape: true,
+                    text: _.escape(data.msg).replace(/\n/g, '<br />'),
                     type: theme,
                     hide: data.type === 'info' || data.type === 'tmp_error' || data.type === 'tmp_danger' || data.type === 'success',
                     buttons: {closer: true, sticker: false}
@@ -536,6 +619,27 @@ $(function () {
             }
         }
         validatorMessageHandler = this.onDataUpdaterPluginMessage.bind(this);
+        this.onSettingsShown = function () {
+            if ($('.nozzle-filament-validator:visible').length) {
+                displayData(false);
+            }
+        };
+        $(document)
+            .off('click.nfvSettings', 'a[href="#settings_plugin_Nozzle_Filament_Validator"]')
+            .on('click.nfvSettings', 'a[href="#settings_plugin_Nozzle_Filament_Validator"]', function () {
+                window.setTimeout(function () {
+                    if ($('.nozzle-filament-validator:visible').length) {
+                        displayData(false);
+                    }
+                }, 0);
+            });
+        this.onStartupComplete = function () {
+            OctoPrint.simpleApiCommand(PLUGIN_ID, "get_active_prompt", {}).done(function (response) {
+                if (response.active_prompt && validatorMessageHandler) {
+                    validatorMessageHandler(PLUGIN_ID, response.active_prompt);
+                }
+            });
+        };
     }
 
 
@@ -543,12 +647,7 @@ $(function () {
     OCTOPRINT_VIEWMODELS.push({
         construct: messageHandler,
         additionalNames: ["messageHandler"],
-        dependencies: ["loginStateViewModel", "appearanceViewModel"],
-        elements: [""]
-    });
-
-    // Initial display of data
-    sleep(500).then(() => {
-        displayData();
+        dependencies: ["loginStateViewModel", "appearanceViewModel", "filesViewModel"],
+        elements: [".nozzle-filament-validator"]
     });
 });

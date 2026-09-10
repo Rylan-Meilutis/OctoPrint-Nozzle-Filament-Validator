@@ -15,8 +15,19 @@ function setRefreshButtons() {
     $('#check-filament-type-checkbox').change(function () {
         update_filament_type_checking(this.checked);
     });
+    $('#validate-on-upload-checkbox').change(function () {
+        update_validate_on_upload(this.checked);
+    });
     $('#check-spool-id-timeout-input').change(function () {
         update_check_spool_id_timeout(this.value);
+    });
+    $('#extruder-tabs').off('click', '.save-manual-filament');
+    $('#extruder-tabs').on('click', '.save-manual-filament', function () {
+        let extruderPosition = Number($(this).data('extruder-position'));
+        let filamentType = $(`#manual-filament-${extruderPosition}`).val();
+        if (filamentType) {
+            update_manual_filament(extruderPosition, filamentType);
+        }
     });
 }
 
@@ -35,6 +46,23 @@ function update_check_spool_id(isChecked) {
 function update_filament_type_checking(isChecked) {
     OctoPrint.simpleApiCommand(PLUGIN_ID, "update_filament_type_checking", {
         "enabled": isChecked
+    }).done(function () {
+        displayData();
+    });
+}
+
+function update_validate_on_upload(isChecked) {
+    OctoPrint.simpleApiCommand(PLUGIN_ID, "update_validate_on_upload", {
+        "enabled": isChecked
+    }).done(function () {
+        displayData();
+    });
+}
+
+function update_manual_filament(extruderPosition, filamentType) {
+    OctoPrint.simpleApiCommand(PLUGIN_ID, "update_manual_filament", {
+        "extruderPosition": extruderPosition,
+        "filamentType": filamentType
     }).done(function () {
         displayData();
     });
@@ -70,7 +98,9 @@ function updateSpool(dbID, extruderPos) {
     }).fail(function (data) {
         new PNotify({
             title: 'SpoolManager Error',
+            title_escape: true,
             text: 'Failed to select spool:' + data.responseText,
+            text_escape: true,
             type: 'error',
             hide: false,
             closer: true,
@@ -99,7 +129,9 @@ function get_spools() {
         }).fail(function (data) {
             new PNotify({
                 title: 'SpoolManager Error',
+                title_escape: true,
                 text: 'Failed to get spools:' + data.responseText,
+                text_escape: true,
                 type: 'error',
                 hide: false,
                 closer: true,

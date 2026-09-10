@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import logging
 import math
 import os
 import re
 import threading
 import time
-from typing import Any, Union, Dict, List, Tuple
+from typing import Any
 
 from octoprint_nfv.constants import alert_types
 
@@ -18,7 +20,7 @@ class filament_timeout:
     cancel = "cancel"
 
 
-def parse_gcode(file_path: str) -> Dict[str, Any]:
+def parse_gcode(file_path: str) -> dict[str, Any]:
     """
     Parse the GCODE file to extract the nozzle diameter and filament type
     :param file_path: the path to the GCODE file
@@ -37,7 +39,7 @@ def parse_gcode(file_path: str) -> Dict[str, Any]:
     # Number of lines to read from the end of the file
     num_lines = 1000
 
-    with open(file_path, 'r', encoding='utf-8', errors='replace') as file:
+    with open(file_path, encoding='utf-8', errors='replace') as file:
         # Move the file pointer to the end
         file.seek(0, os.SEEK_END)
         file_size = file.tell()
@@ -112,7 +114,7 @@ def ends_with_mmu(string: str) -> bool:
     return bool(match_1 or match_2 or match_3)
 
 
-def match_ends_with_mmu(string: str) -> Union[str, None]:
+def match_ends_with_mmu(string: str) -> str | None:
     """
     Match the string that ends with mmu3 or mmu3s or mmu2 or mmu2s or mmu3is or mmu3sis or mmu2is or mmu2sis
     :param string: the string to match
@@ -178,6 +180,32 @@ class validator:
         self._prompt_lock = threading.RLock()
         self._active_prompt = None
         self._prompt_deadline = None
+        self.last_check_cacheable = False
+        self._validation_was_overridden = False
+        # Keys are zero-based slicer/logical tools and values are zero-based
+        # physical tools. Identity is the safe default when RME is absent.
+        self._tool_mapping = {}
+
+    def set_tool_mapping(self, mapping: dict[int, int]) -> bool:
+        """Set the confirmed logical-to-physical mapping for the next checks."""
+        normalized = {int(logical): int(physical) for logical, physical in mapping.items()}
+        if any(logical < 0 or physical < 0 for logical, physical in normalized.items()):
+            raise ValueError("Tool mapping indices must be non-negative")
+        if normalized == self._tool_mapping:
+            return False
+        self._tool_mapping = normalized
+        return True
+
+    def physical_tool(self, logical_tool: int) -> int:
+        """Resolve a slicer tool to the physical tool configured by RME."""
+        logical_tool = int(logical_tool)
+        return self._tool_mapping.get(logical_tool, logical_tool)
+
+    def _tool_description(self, logical_tool: int) -> str:
+        physical = self.physical_tool(logical_tool)
+        if physical == logical_tool:
+            return f"extruder {logical_tool + 1}"
+        return f"logical extruder {logical_tool + 1} (physical tool {physical + 1})"
 
     def pause_print(self) -> None:
         """
@@ -197,7 +225,7 @@ class validator:
         if state != filament_timeout.waiting:
             self.clear_active_prompt()
 
-    def set_active_prompt(self, prompt_type: str, message: str, timeout: int) -> Dict[str, Any]:
+    def set_active_prompt(self, prompt_type: str, message: str, timeout: int) -> dict[str, Any]:
         timeout = max(0, int(timeout))
         with self._prompt_lock:
             self._active_prompt = {"type": prompt_type, "msg": message}
@@ -209,7 +237,7 @@ class validator:
             self._active_prompt = None
             self._prompt_deadline = None
 
-    def get_active_prompt(self) -> Union[Dict[str, Any], None]:
+    def get_active_prompt(self) -> dict[str, Any] | None:
         with self._prompt_lock:
             if self._active_prompt is None or self._prompt_deadline is None:
                 return None
@@ -245,6 +273,7 @@ class validator:
             time.sleep(0.1)
 
         if self.filament_wait_status == filament_timeout.ok:
+            self._validation_was_overridden = True
             self.send_alert("Validation warning acknowledged; continuing at the user's request.", alert_types.info)
             return True
 
@@ -259,6 +288,8 @@ class validator:
         :param file_path: The path to the GCODE file
         """
         self.paused = False
+        self.last_check_cacheable = False
+        self._validation_was_overridden = False
         if not file_path or not os.path.isfile(file_path):
             return self.prompt_validation_override(
                 f"The GCODE file {file_path!r} could not be read, so it could not be validated.")
@@ -279,6 +310,7 @@ class validator:
 
         if skip_validation:
             self._logger.warning("GCODE validation explicitly skipped by file directive")
+            self.last_check_cacheable = True
             return True
 
         nozzles = gcode_info["nozzle_size"]
@@ -294,6 +326,15 @@ class validator:
         if missing_fields:
             return self.prompt_validation_override(
                 "Required slicer metadata is missing: " + ", ".join(missing_fields))
+
+        # A single-extruder multi-material printer has one physical nozzle but
+        # one filament/usage entry per logical tool. Normalize that valid
+        # slicer representation before comparing metadata lengths so every
+        # used logical tool is still validated against the shared nozzle.
+        if (semm and len(nozzles) == 1
+                and len(filament_types) == len(filament_used)
+                and len(filament_types) > 1):
+            nozzles = nozzles * len(filament_types)
 
         if not (len(nozzles) == len(filament_types) == len(filament_used)):
             return self.prompt_validation_override(
@@ -375,6 +416,7 @@ class validator:
 
             # Check if the print passed all checks
             if nozzle_passed and filament_passed and spool_passed:
+                self.last_check_cacheable = not self._validation_was_overridden
                 self.send_alert("Print passed nozzle and filament check", alert_types.success)
                 self._logger.info("Print passed nozzle and filament check...")
                 return True
@@ -419,7 +461,7 @@ class validator:
             if remove_mmu_from_end(self.get_printer_model().lower()).endswith("is"):
                 if not remove_mmu_from_end(printer_model.lower()).endswith("is"):
                     self.send_alert(
-                        f"Printing with non InputShaping profile on a printer that supports input shaping",
+                        "Printing with non InputShaping profile on a printer that supports input shaping",
                         alert_types.info)
 
             if remove_is_from_end(self.get_printer_model().lower()) != printer_model.lower():
@@ -428,8 +470,8 @@ class validator:
                 return False
         return True
 
-    def check_mmu(self, printer_model: str = None, nozzles: List[str] = None, filament_types: List[str] = None,
-                  filament_used: List[str] = None) -> Tuple[bool, bool]:
+    def check_mmu(self, printer_model: str = None, nozzles: list[str] = None, filament_types: list[str] = None,
+                  filament_used: list[str] = None) -> tuple[bool, bool]:
         """
         Check if using an mmu and handle it accordingly
         :param printer_model: the printer model from the GCODE
@@ -455,8 +497,8 @@ class validator:
 
         return True, mmu_single_mode
 
-    def check_num_filaments(self, loaded_filaments: List[str], filament_types: List[str],
-                            filament_used: List[str], ) -> bool:
+    def check_num_filaments(self, loaded_filaments: list[str], filament_types: list[str],
+                            filament_used: list[str], ) -> bool:
         """
         Check the number of filaments in the GCODE
 
@@ -483,7 +525,7 @@ class validator:
 
         return True
 
-    def check_num_extruders(self, nozzles: List[str], semm) -> bool:
+    def check_num_extruders(self, nozzles: list[str], semm) -> bool:
         """
         Check the number of extruders in the GCODE
         :param semm: Single Extruder Multi Material
@@ -504,8 +546,8 @@ class validator:
 
         return True
 
-    def check_filament_type(self, index: int, loaded_filaments: List[str], filament_types: List[str],
-                            gcode_info: Dict[str, Any], filament_passed: bool, mmu_single_mode: bool) -> Tuple[bool, bool]:
+    def check_filament_type(self, index: int, loaded_filaments: list[str], filament_types: list[str],
+                            gcode_info: dict[str, Any], filament_passed: bool, mmu_single_mode: bool) -> tuple[bool, bool]:
         """
         Check the filament type
         :param index: the index of the extruder
@@ -516,7 +558,12 @@ class validator:
         :param mmu_single_mode: whether the printer is in mmu single mode
         :return: (filament_passed, check_passed) the value filament passed and true if the check passed
         """
-        loaded_filament = loaded_filaments[index] if loaded_filaments is not None else None
+        physical_index = self.physical_tool(index)
+        loaded_filament = (
+            loaded_filaments[physical_index]
+            if loaded_filaments is not None and physical_index < len(loaded_filaments)
+            else None
+        )
 
         # Check if the loaded filament matches the filament alert_type in the GCODE
         if filament_types[index] is None and filament_passed and not mmu_single_mode:
@@ -546,14 +593,14 @@ class validator:
             if (filament_types[index].lower() != str(loaded_filament).lower() and gcode_info[
                 "filament_type"][index] is not
                     None):
-                self.send_alert(f"Validation warning: Incorrect filament type on extruder {index + 1}. expected "
+                self.send_alert(f"Validation warning: Incorrect filament type on {self._tool_description(index)}. expected "
                                 f"{filament_types[index]}, but {loaded_filament} is currently loaded",
                                 alert_types.error)
                 return filament_passed, False
 
         return filament_passed, True
 
-    def check_nozzle(self, index: int, nozzles: List[str], nozzle_passed: bool) -> Tuple[bool, bool]:
+    def check_nozzle(self, index: int, nozzles: list[str], nozzle_passed: bool) -> tuple[bool, bool]:
         """
         Check the nozzle size
         :param index: index of the extruder
@@ -562,6 +609,10 @@ class validator:
         :return: (nozzle_passed, check_passed) the value of nozzle_passed and true if the check passed
         """
 
+        # NFV's database uses one-based physical extruder positions while GCODE
+        # metadata and the RME mapping use zero-based logical indices.
+        physical_position = self.physical_tool(index) + 1
+
         # Check if the loaded nozzle size matches the nozzle size in the GCODE
         if nozzles[index] is None and nozzle_passed:
             self.send_alert("No nozzle size found in GCODE, error checking won't be performed",
@@ -569,24 +620,24 @@ class validator:
             nozzle_passed = False
 
         # Check if the nozzle size is None and nozzle_passed is True
-        elif self.extruders.get_nozzle_size_for_extruder(index + 1) is None and nozzle_passed:
-            self.send_alert(f"No nozzle selected for extruder {index + 1}, error checking won't be performed",
+        elif self.extruders.get_nozzle_size_for_extruder(physical_position) is None and nozzle_passed:
+            self.send_alert(f"No nozzle selected for {self._tool_description(index)}, error checking won't be performed",
                             alert_types.info)
             nozzle_passed = False
 
         # Check if the nozzle size is not None and nozzle_passed is True
         if nozzle_passed:
-            if (float(nozzles[index]) != float(self.extruders.get_nozzle_size_for_extruder(index + 1)) and
+            if (float(nozzles[index]) != float(self.extruders.get_nozzle_size_for_extruder(physical_position)) and
                     nozzles[index] is
                     not None):
-                self.send_alert(f"Validation warning: Incorrect nozzle size on extruder {index + 1}. expected "
+                self.send_alert(f"Validation warning: Incorrect nozzle size on {self._tool_description(index)}. expected "
                                 f"{nozzles[index]}mm nozzle, but"
-                                f" {self.extruders.get_nozzle_size_for_extruder(index + 1)}mm nozzle is currently "
+                                f" {self.extruders.get_nozzle_size_for_extruder(physical_position)}mm nozzle is currently "
                                 f"installed", alert_types.error)
                 return nozzle_passed, False
         return nozzle_passed, True
 
-    def check_build_plate(self, index: int, filament_types: List[str], gcode_info: Dict[str, Any]) -> bool:
+    def check_build_plate(self, index: int, filament_types: list[str], gcode_info: dict[str, Any]) -> bool:
         """
         Check if the build plate is compatible with the loaded filament
         :param index: index of the extruder
@@ -604,7 +655,7 @@ class validator:
                 return False
         return True
 
-    def check_spool_id(self, index: int, gcode_info: Dict[str, Any], passed: bool) -> Tuple[bool, bool]:
+    def check_spool_id(self, index: int, gcode_info: dict[str, Any], passed: bool) -> tuple[bool, bool]:
         """
         Check the spool id, if it is invalid, wait for input from the frontend
         :param index: index of the extruder
@@ -613,7 +664,8 @@ class validator:
         :return: true if the check passed
         """
 
-        if not self._filament.get_enable_spool_checking():
+        if (not self._filament.get_enable_spool_checking()
+                or not getattr(self._spool_manager, "is_available", lambda: True)()):
             return True, True
 
         timeout = self._filament.get_timeout()
@@ -629,19 +681,23 @@ class validator:
 
         match = re.search(r"\[\s*sm_name\s*=\s*([^]]*\S)]", raw_data)
 
-        current_fil_id = self._spool_manager.get_names()[index]
+        physical_index = self.physical_tool(index)
+        selected_names = self._spool_manager.get_names()
+        current_fil_id = selected_names[physical_index] if physical_index < len(selected_names) else None
 
         if match:
             spool_id = str(match.group(1))
             if current_fil_id is None:
+                self._validation_was_overridden = True
                 self.update_filament_wait_status(filament_timeout.waiting)
-                message = f"{spool_id}, {index}, None Selected, {self._filament.get_timeout()}"
+                message = f"{spool_id}, {physical_index}, None Selected, {self._filament.get_timeout()}"
                 prompt = self.set_active_prompt(alert_types.switch_spools, message, timeout)
                 self._plugin_manager.send_plugin_message(self._identifier, prompt)
 
             elif str(current_fil_id) != spool_id:
+                self._validation_was_overridden = True
                 self.update_filament_wait_status(filament_timeout.waiting)
-                message = f"{spool_id}, {index}, {current_fil_id}, {self._filament.get_timeout()}"
+                message = f"{spool_id}, {physical_index}, {current_fil_id}, {self._filament.get_timeout()}"
                 prompt = self.set_active_prompt(alert_types.switch_spools, message, timeout)
                 self._plugin_manager.send_plugin_message(self._identifier, prompt)
 

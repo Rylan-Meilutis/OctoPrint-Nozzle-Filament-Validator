@@ -1,0 +1,45 @@
+[build-system]
+requires = [
+    "setuptools>=68",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "OctoPrint-Nozzle-Filament-Validator"
+version = "3.3.0"
+description = "Validate nozzle size, build plate, and filament type before starting a print."
+authors = [
+    { name = "Rylan Meilutis", email = "rylan.meilutis@gmail.com" },
+]
+requires-python = ">=3.7,<4"
+dependencies = [
+    "OctoPrint>=1.10.0",
+    "Flask>=2.2.5",
+]
+dynamic = [
+    "license",
+]
+
+[project.entry-points."octoprint.plugin"]
+Nozzle_Filament_Validator = "octoprint_nfv"
+
+[project.urls]
+Homepage = "https://github.com/Rylan-Meilutis/OctoPrint-Nozzle-Filament-Validator"
+
+[project.optional-dependencies]
+develop = [
+    "go-task-bin",
+]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = [
+    "octoprint_nfv",
+    "octoprint_nfv.*",
+]

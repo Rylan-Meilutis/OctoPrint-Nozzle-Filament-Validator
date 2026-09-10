@@ -37,6 +37,22 @@ class _Extruders:
         return 0.4
 
 
+class _RemappedExtruders:
+    def get_number_of_extruders(self):
+        return 2
+
+    def get_nozzle_size_for_extruder(self, position):
+        return {1: 0.6, 2: 0.4}[position]
+
+
+class _FiveSharedNozzleExtruders:
+    def get_number_of_extruders(self):
+        return 5
+
+    def get_nozzle_size_for_extruder(self, position):
+        return 0.4
+
+
 class _SpoolManager:
     def get_loaded_filaments(self):
         return -1
@@ -66,6 +82,46 @@ class _TypesDisabledFilament(_Filament):
 class _WrongTypeSpoolManager:
     def get_loaded_filaments(self):
         return ["ABS"]
+
+
+class _FiveSlotSpoolManager:
+    def get_loaded_filaments(self):
+        return ["PLA", "PLA", "PETG", "PLA", "PLA"]
+
+
+class _ManualFilamentProvider:
+    def __init__(self, material):
+        self.material = material
+
+    def is_available(self):
+        return False
+
+    def get_loaded_filaments(self):
+        return [self.material]
+
+    def get_names(self):
+        return []
+
+
+class _SpoolmanProvider(_ManualFilamentProvider):
+    def is_available(self):
+        return True
+
+    def get_names(self):
+        return ["spoolman:42"]
+
+
+class _RmeProvider(_ManualFilamentProvider):
+    def is_available(self):
+        return True
+
+    def get_names(self):
+        return ["rme:internal:4"]
+
+
+class _NameCheckingFilament(_Filament):
+    def get_enable_spool_checking(self):
+        return True
 
 
 class _Printer:
@@ -124,6 +180,7 @@ class ValidatorTests(unittest.TestCase):
 
     def test_valid_file_passes_without_spool_manager(self):
         self.assertTrue(self.validator.check_print(self.write_gcode(VALID_GCODE)))
+        self.assertTrue(self.validator.last_check_cacheable)
         self.assertFalse(self.printer.cancelled)
         self.assertFalse(self.printer.paused)
 
@@ -144,11 +201,36 @@ class ValidatorTests(unittest.TestCase):
         timer.start()
         self.addCleanup(timer.cancel)
         self.assertTrue(self.validator.check_print(self.write_gcode("G28\n")))
+        self.assertFalse(self.validator.last_check_cacheable)
 
     def test_filament_type_toggle_is_independent_of_spool_name_toggle(self):
         self.validator._filament = _TypesDisabledFilament()
         self.validator._spool_manager = _WrongTypeSpoolManager()
         self.assertTrue(self.validator.check_print(self.write_gcode(VALID_GCODE)))
+
+    def test_manual_filament_is_validated_without_spool_name_checking(self):
+        self.validator._filament = _NameCheckingFilament()
+        self.validator._spool_manager = _ManualFilamentProvider("PLA")
+        self.assertTrue(self.validator.check_print(self.write_gcode(VALID_GCODE)))
+
+        self.validator._spool_manager = _ManualFilamentProvider("ABS")
+        self.assertFalse(self.validator.check_print(self.write_gcode(VALID_GCODE)))
+
+    def test_spoolman_identifier_supports_spool_name_validation(self):
+        self.validator._filament = _NameCheckingFilament()
+        self.validator._spool_manager = _SpoolmanProvider("PLA")
+        with_identifier = VALID_GCODE.replace(
+            "G28\n", "; filament_notes = [sm_name = spoolman:42]\nG28\n")
+
+        self.assertTrue(self.validator.check_print(self.write_gcode(with_identifier)))
+
+    def test_rme_identifier_supports_spool_name_validation(self):
+        self.validator._filament = _NameCheckingFilament()
+        self.validator._spool_manager = _RmeProvider("PLA")
+        with_identifier = VALID_GCODE.replace(
+            "G28\n", "; filament_notes = [sm_name = rme:internal:4]\nG28\n")
+
+        self.assertTrue(self.validator.check_print(self.write_gcode(with_identifier)))
 
     def test_active_prompt_can_be_replayed_then_cleared(self):
         self.validator.set_active_prompt("validation_prompt", "Still waiting", 10)
@@ -162,6 +244,42 @@ class ValidatorTests(unittest.TestCase):
     def test_skip_validation_directive_is_explicit(self):
         self.assertTrue(self.validator.check_print(self.write_gcode("G28\n; skip_validation\n")))
         self.assertFalse(self.validator.check_print(self.write_gcode("G28\n; skip_validation_but_not_really\n")))
+
+    def test_remapped_tool_uses_physical_nozzle_and_filament(self):
+        self.validator.extruders = _RemappedExtruders()
+        self.validator.set_tool_mapping({0: 1})
+        self.assertEqual(1, self.validator.physical_tool(0))
+        self.assertEqual((True, True), self.validator.check_nozzle(0, ["0.4"], True))
+        self.assertEqual(
+            (True, True),
+            self.validator.check_filament_type(
+                0, ["ABS", "PLA"], ["PLA"], {"filament_type": ["PLA"]}, True, False
+            ),
+        )
+
+    def test_semm_metadata_reuses_one_physical_nozzle_for_five_logical_tools(self):
+        self.validator.extruders = _FiveSharedNozzleExtruders()
+        self.validator._spool_manager = _FiveSlotSpoolManager()
+        self.validator.build_plate.is_filament_compatible_with_build_plate = (
+            lambda filament_type: filament_type in ("PLA", "PETG")
+        )
+        gcode = """; nozzle_diameter = 0.4
+; filament_type = PLA;PLA;PETG;PLA;PLA
+; filament used [mm] = 0.00,0.00,26929.21,0.00,0.00
+; printer_model = Test Printer
+; single_extruder_multi_material = 1
+T2
+"""
+
+        self.assertTrue(self.validator.check_print(self.write_gcode(gcode)))
+        self.assertTrue(self.validator.last_check_cacheable)
+        self.assertFalse(any("different tool counts" in message[1].get("msg", "")
+                             for message in self.plugin_manager.messages))
+
+    def test_repeating_identical_tool_mapping_is_not_a_change(self):
+        self.assertTrue(self.validator.set_tool_mapping({2: 0}))
+        self.assertFalse(self.validator.set_tool_mapping({2: 0}))
+        self.assertTrue(self.validator.set_tool_mapping({2: 1}))
 
 
 if __name__ == "__main__":

@@ -2,6 +2,10 @@
 
 This plugin validates slicer profile, nozzle size (for each extruder), build plate, and filament type (for each
 extruder) before starting a print.
+
+When OctoPrint RME Compatibility supplies a logical-to-physical tool mapping,
+validation runs after mapping confirmation and checks each logical slicer tool
+against the selected physical tool's nozzle and SpoolManager assignment.
 It uses the slicer config present in the gcode to work, it is not a replacement for checking yourself but can help to
 prevent simple
 mistakes from occurring
@@ -44,9 +48,19 @@ know you sliced the gcode correctly and paste it into the printer profile).
 Go to plugin settings and set your nozzle size for each extruder (or extruder 1 if you have a single tool head machine,
 and build plate.
 
-Filament type should be set automatically if you have spool manager installed and have set
-the filament type for the spool.
-If you do not have spool manager installed, filament type will not be checked.
+Filament type is set automatically when SpoolManager or the OctoPrint Spoolman plugin is installed
+and its selected spools have materials configured. When neither is available, RME Compatibility's
+provider-neutral filament report is used. Without any of these plugins, select the loaded material
+for each extruder on the plugin settings page. These manual selections allow filament-type validation
+to continue, but filament/spool-name validation requires an external provider.
+
+For Spoolman, the unique `spoolman:<id>` identifier shown on each extruder tab is used for optional
+spool-name validation. Add it to the slicer's filament notes in the same format, for example
+`[sm_name = spoolman:123]`.
+
+RME Compatibility inventory selections use `rme:<provider>:<id>` identifiers, for example
+`[sm_name = rme:internal:4]`. Firmware-only RME loadouts provide material metadata but no unique
+spool identity. Provider priority is SpoolManager, Spoolman, RME Compatibility, then manual selection.
 
 If using a plugin that runs a .gcode file such as the continuous print queue plugin, You can skip gcode validation for
 that file by adding
@@ -76,6 +90,22 @@ Filament validation has two independent settings: **Validate filament types** co
 material type reported by SpoolManager, while **Validate filament/spool names** checks the
 `sm_name` value from filament notes. Either check can be disabled without disabling the
 other nozzle, build-plate, printer-model, or tool-count checks.
+
+### Early file validation
+
+Version 3.3.0 can validate local G-code before print start. Enable **Validate local G-code
+files when uploaded** to check each newly uploaded machine-code file automatically, or use
+the checkmark button on any local G-code row in OctoPrint's Files panel to validate it on
+demand. Files stored on the printer's SD card do not show the button because OctoPrint
+cannot read them for validation.
+
+A successful result is stored with the file and reused at print start, including after an
+OctoPrint restart. It is reused only when the file's size and modification/change timestamps
+and the complete validation configuration still match. Printer-profile, build-plate,
+extruder/nozzle, SpoolManager filament/name, validation-setting, and logical-to-physical tool
+mapping changes all force a normal pre-print validation instead.
+Choosing **Continue anyway** or ignoring a spool mismatch applies only to that validation
+request and is never stored as a reusable success.
 
 ## Multi Extruder Support
 
@@ -129,6 +159,4 @@ Nothing major at the moment, just bug fixes, removing unused functions, and othe
 -  ** Add the ability to change the spool type in the gcode from the octoprint webui.
 
 
-- Add the ability to auto scan new files for compatibility when they are uploaded and remove them if they are not
-  compatible
 - Add the ability to scan all files and remove ones that aren't compatible
